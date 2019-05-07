@@ -90,11 +90,7 @@ public class KafkaJsonMessagePoller<T> implements Closeable {
     }
 
     private void handleRecord(ConsumerRecord<String, String> record) {
-        MessageInfo info = new KafkaMessageInfo(
-                record.topic(),
-                record.partition(),
-                record.offset(),
-                record.timestamp());
+        MessageInfo info = new KafkaMessageInfo(record);
         String payload = record.value();
         try {
             T message = reader.readValue(payload);

@@ -114,11 +114,7 @@ public class KafkaMessagePoller implements Closeable {
     }
 
     private void handleRecord(HandlerAdapter<?> adapter, ConsumerRecord<String, byte[]> record) throws Exception {
-        MessageInfo info = new KafkaMessageInfo(
-                record.topic(),
-                record.partition(),
-                record.offset(),
-                record.timestamp());
+        MessageInfo info = new KafkaMessageInfo(record);
         ByteString payload = ByteString.copyFrom(record.value());
         adapter.handle(info, payload);
     }
