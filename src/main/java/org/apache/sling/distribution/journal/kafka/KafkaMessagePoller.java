@@ -18,34 +18,35 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
+import static java.lang.String.format;
+import static java.time.Duration.ofHours;
+import static java.util.stream.Collectors.joining;
+import static org.apache.sling.distribution.journal.RunnableUtil.startBackgroundThread;
+
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
-import org.apache.sling.distribution.journal.messages.Types;
-import org.apache.sling.distribution.journal.HandlerAdapter;
-import org.apache.sling.distribution.journal.MessageInfo;
-import com.google.protobuf.ByteString;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.Headers;
+import org.apache.sling.distribution.journal.HandlerAdapter;
+import org.apache.sling.distribution.journal.MessageInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.sling.distribution.journal.RunnableUtil.startBackgroundThread;
-import static java.lang.Integer.parseInt;
-import static java.lang.String.format;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.time.Duration.ofHours;
+import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 
 public class KafkaMessagePoller implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaMessagePoller.class);
 
-    private final Map<Class<?>, HandlerAdapter<?>> handlers = new HashMap<>();
+    private final List<HandlerAdapter<?>> handlers;
 
     private final KafkaConsumer<String, byte[]> consumer;
 
@@ -55,10 +56,8 @@ public class KafkaMessagePoller implements Closeable {
 
     public KafkaMessagePoller(KafkaConsumer<String, byte[]> consumer, HandlerAdapter<?>... handlerAdapters) {
         this.consumer = consumer;
-        for (HandlerAdapter<?> handlerAdapter : handlerAdapters) {
-            handlers.put(handlerAdapter.getType(), handlerAdapter);
-        }
-        types = handlers.keySet().toString();
+        handlers = Arrays.asList(handlerAdapters);
+        types = handlers.stream().map(HandlerAdapter::getType).map(Class::getSimpleName).collect(joining(","));
         startBackgroundThread(this::run, format("Message Poller %s", types));
     }
 
@@ -97,37 +96,23 @@ public class KafkaMessagePoller implements Closeable {
     }
 
     private void handleRecord(ConsumerRecord<String, byte[]> record) {
-        Class<?> type = Types.getType(
-                parseInt(getHeaderValue(record.headers(), "type")),
-                parseInt(getHeaderValue(record.headers(), "version")));
-        HandlerAdapter<?> adapter = handlers.get(type);
-        if (adapter != null) {
-            try {
-                handleRecord(adapter, record);
-            } catch (Exception e) {
-                String msg = format("Error consuming message for types %s", types);
-                LOG.warn(msg);
+        try {
+            MessageInfo info = new KafkaMessageInfo(
+                    record.topic(),
+                    record.partition(),
+                    record.offset(),
+                    record.timestamp());
+            ByteString payload = ByteString.copyFrom(record.value());
+            Any any = Any.parseFrom(payload);
+            Optional<HandlerAdapter<? extends Message>> handler = handlers.stream().filter(adapter -> any.is(adapter.getType())).findFirst();
+            if (handler.isPresent()) {
+                handler.get().handle(info, any);
+            } else {
+                LOG.debug("No handler found for {}", any);
             }
-        } else {
-            LOG.debug("No handler registered for type {}", type.getName());
+        } catch (InvalidProtocolBufferException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private void handleRecord(HandlerAdapter<?> adapter, ConsumerRecord<String, byte[]> record) throws Exception {
-        MessageInfo info = new KafkaMessageInfo(
-                record.topic(),
-                record.partition(),
-                record.offset(),
-                record.timestamp());
-        ByteString payload = ByteString.copyFrom(record.value());
-        adapter.handle(info, payload);
-    }
-
-    private String getHeaderValue(Headers headers, String key) {
-        Header header = headers.lastHeader(key);
-        if (header == null) {
-            throw new IllegalArgumentException(format("Header with key %s not found", key));
-        }
-        return new String(header.value(), UTF_8);
-    }
 }

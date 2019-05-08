@@ -18,25 +18,22 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
-import java.util.Arrays;
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
+import static org.apache.sling.distribution.journal.kafka.KafkaClientProvider.PARTITION;
+
 import java.util.concurrent.ExecutionException;
 
-import org.apache.sling.distribution.journal.messages.Types;
-import org.apache.sling.distribution.journal.MessageSender;
-import org.apache.sling.distribution.journal.MessagingException;
-import com.google.protobuf.GeneratedMessage;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.sling.distribution.journal.MessageSender;
+import org.apache.sling.distribution.journal.MessagingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.lang.String.format;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Objects.requireNonNull;
-import static org.apache.sling.distribution.journal.kafka.KafkaClientProvider.PARTITION;
+import com.google.protobuf.Any;
+import com.google.protobuf.GeneratedMessage;
 
 public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSender<T> {
 
@@ -53,12 +50,8 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
      */
     @Override
     public void send(String topic, T payload) {
-        Integer type = Types.getType(payload.getClass());
-        if (type == null) {
-            throw new IllegalArgumentException("No mapping for type " + payload.getClass().getName());
-        }
-        int version = Types.getVersion(payload.getClass());
-        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, PARTITION, null, null, payload.toByteArray(), toHeaders(type, version));
+        Any any = Any.pack(payload);
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, PARTITION, null, null, any.toByteArray());
         try {
             RecordMetadata metadata = producer.send(record).get();
             LOG.info(format("Sent to %s", metadata));
@@ -67,12 +60,4 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
         }
     }
 
-    private Iterable<Header> toHeaders(int type, int version) {
-        return Arrays.asList(toHeader("type", type),
-                toHeader("version",version));
-    }
-
-    private Header toHeader(String key, int value) {
-        return new RecordHeader(key, Integer.toString(value).getBytes(UTF_8));
-    }
 }
