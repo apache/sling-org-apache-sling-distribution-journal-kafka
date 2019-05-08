@@ -38,6 +38,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -46,9 +47,11 @@ import javax.annotation.Nullable;
 
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.sling.distribution.journal.HandlerAdapter;
@@ -112,7 +115,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     @Override
     public Closeable createPoller(String topicName, Reset reset, @Nullable String assign, HandlerAdapter<?>... adapters) {
         String consumerGroupId = UUID.randomUUID().toString();
-        KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(consumerConfig(ByteArrayDeserializer.class, consumerGroupId, reset));
+        KafkaConsumer<String, byte[]> consumer = createConsumer(ByteArrayDeserializer.class, reset);
         TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
         Collection<TopicPartition> topicPartitions = singleton(topicPartition);
         consumer.assign(topicPartitions);
@@ -135,8 +138,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     @Override
     public <T> Closeable createJsonPoller(String topicName, Reset reset, MessageHandler<T> handler, Class<T> type) {
-        String consumerGroupId = UUID.randomUUID().toString();
-        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerConfig(StringDeserializer.class, consumerGroupId, reset));
+        KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, reset);
         TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
         Collection<TopicPartition> topicPartitions = singleton(topicPartition);
         consumer.assign(topicPartitions);
@@ -150,35 +152,43 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     @Override
     public void assertTopic(String topic) throws MessagingException {
-        String consumerGroupId = UUID.randomUUID().toString();
-        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerConfig(StringDeserializer.class, consumerGroupId, Reset.latest))) {
-            if (! consumer.listTopics().containsKey(topic)) {
-                throw new MessagingException(format("Topic %s does not exist", topic));
-            }
+        Map<String, List<PartitionInfo>> topics;
+        try (KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, Reset.latest)) {
+            topics = consumer.listTopics();
         } catch (Exception e) {
             throw new MessagingException(format("Unable to load topic stats for %s", topic), e);
+        }
+        if (! topics.containsKey(topic)) {
+            throw new MessagingException(format("Topic %s does not exist", topic));
         }
     }
 
     @Override
     public long retrieveOffset(String topicName, Reset reset) {
-        String groupId = UUID.randomUUID().toString();
-        KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(consumerConfig(ByteArrayDeserializer.class, groupId, reset));
-        TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
-        Collection<TopicPartition> topicPartitions = singleton(topicPartition);
-        final Map<TopicPartition, Long> offsets;
-        if (reset == Reset.earliest) {
-            offsets = consumer.beginningOffsets(topicPartitions);
-        } else {
-            offsets = consumer.endOffsets(topicPartitions);
+        try (KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, reset)) {;
+            TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
+            Map<TopicPartition, Long> offsets = getOffsets(reset, consumer, topicPartition);
+            Long offset = offsets.get(topicPartition);
+            return offset;
         }
-        consumer.close();
-        return offsets.get(topicPartition);
+    }
+
+    private Map<TopicPartition, Long> getOffsets(Reset reset, KafkaConsumer<String, String> consumer,
+            TopicPartition topicPartition) {
+        Collection<TopicPartition> topicPartitions = singleton(topicPartition);
+        return (reset == Reset.earliest) //
+                ? consumer.beginningOffsets(topicPartitions)
+                : consumer.endOffsets(topicPartitions);
     }
 
     @Override
     public String assignTo(long offset) {
         return format("%s:%s", PARTITION, offset);
+    }
+
+    protected <T> KafkaConsumer<String, T> createConsumer(Class<? extends Deserializer<?>> deserializer, Reset reset) {
+        String groupId = UUID.randomUUID().toString();
+        return new KafkaConsumer<>(consumerConfig(deserializer, groupId, reset));
     }
 
     private void closeQuietly(final Closeable closeable) {
