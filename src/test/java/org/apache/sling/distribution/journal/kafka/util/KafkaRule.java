@@ -21,16 +21,15 @@ package org.apache.sling.distribution.journal.kafka.util;
 import static org.osgi.util.converter.Converters.standardConverter;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.sling.distribution.journal.MessagingProvider;
 import org.apache.sling.distribution.journal.kafka.KafkaClientProvider;
 import org.apache.sling.distribution.journal.kafka.KafkaEndpoint;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
-
-import com.google.common.collect.ImmutableMap;
 
 public class KafkaRule implements TestRule {
 
@@ -51,14 +50,15 @@ public class KafkaRule implements TestRule {
         try (KafkaLocal kafka = new KafkaLocal()) {
             this.provider = createProvider();
             base.evaluate();
-            IOUtils.closeQuietly(this.provider);
+            this.provider.close();
         }
     }
 
     private KafkaClientProvider createProvider() {
         KafkaClientProvider provider = new KafkaClientProvider();
-        ImmutableMap<String, String> props = ImmutableMap.of(
-                "connectTimeout", "5000");
+        
+        Map<String, String> props = new HashMap<>();
+        props.put("connectTimeout", "5000");
         KafkaEndpoint config = standardConverter().convert(props).to(KafkaEndpoint.class);
         provider.activate(config);
         return provider;
