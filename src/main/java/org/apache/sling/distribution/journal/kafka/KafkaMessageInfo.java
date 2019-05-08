@@ -18,6 +18,7 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.sling.distribution.journal.MessageInfo;
 
 public class KafkaMessageInfo implements MessageInfo {
