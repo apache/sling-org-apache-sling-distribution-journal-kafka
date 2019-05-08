@@ -18,8 +18,6 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.sling.distribution.journal.MessageInfo;
 
 public class KafkaMessageInfo implements MessageInfo {
@@ -54,6 +52,7 @@ public class KafkaMessageInfo implements MessageInfo {
 
     @Override
     public String toString() {
-        return ToStringBuilder.reflectionToString(this);
+        return String.format("Topic: %s, Partition: %d, Offset: %d, CreateTime: %d", 
+                topic, partition, offset, createTime);
     }
 }

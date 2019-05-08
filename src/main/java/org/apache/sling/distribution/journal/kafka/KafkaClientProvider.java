@@ -35,6 +35,7 @@ import static org.apache.kafka.clients.producer.ProducerConfig.KEY_SERIALIZER_CL
 import static org.apache.kafka.clients.producer.ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +44,6 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.TopicPartition;
@@ -95,8 +95,8 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     
     @Deactivate
     public void close() {
-        IOUtils.closeQuietly(rawProducer);
-        IOUtils.closeQuietly(jsonProducer);
+        closeQuietly(rawProducer);
+        closeQuietly(jsonProducer);
     }
 
     @Override
@@ -179,6 +179,16 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     @Override
     public String assignTo(long offset) {
         return format("%s:%s", PARTITION, offset);
+    }
+
+    private void closeQuietly(final Closeable closeable) {
+        try {
+            if (closeable != null) {
+                closeable.close();
+            }
+        } catch (final IOException ioe) {
+            // ignore
+        }
     }
 
     @Nonnull
