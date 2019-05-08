@@ -27,11 +27,11 @@ public class KafkaMessageInfo implements MessageInfo {
     private final long offset;
     private final long createTime;
 
-    public KafkaMessageInfo(String topic, int partition, long offset, long createTime) {
-        this.topic = topic;
-        this.partition = partition;
-        this.offset = offset;
-        this.createTime = createTime;
+    public KafkaMessageInfo(ConsumerRecord<String, ?> record) {
+        this.topic = record.topic();
+        this.partition = record.partition();
+        this.offset = record.offset();
+        this.createTime = record.timestamp();
     }
 
     public String getTopic() {
