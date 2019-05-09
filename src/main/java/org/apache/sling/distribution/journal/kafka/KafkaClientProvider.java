@@ -114,7 +114,6 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     @Override
     public Closeable createPoller(String topicName, Reset reset, @Nullable String assign, HandlerAdapter<?>... adapters) {
-        String consumerGroupId = UUID.randomUUID().toString();
         KafkaConsumer<String, byte[]> consumer = createConsumer(ByteArrayDeserializer.class, reset);
         TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
         Collection<TopicPartition> topicPartitions = singleton(topicPartition);
@@ -127,7 +126,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
             consumer.seekToEnd(topicPartitions);
         }
         Closeable poller = new KafkaMessagePoller(consumer, adapters);
-        LOG.info(format("Created poller for consumerGroupId %s, reset %s, topicName %s, assign %s", consumerGroupId, reset, topicName, assign));
+        LOG.info("Created poller for reset {}, topicName {}, assign {}", reset, topicName, assign);
         return poller;
     }
 
