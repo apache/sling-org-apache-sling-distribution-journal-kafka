@@ -97,10 +97,17 @@ public class KafkaMessagePoller implements Closeable {
     }
 
     private void handleRecord(ConsumerRecord<String, byte[]> record) {
-        Class<?> type = Types.getType(
-                parseInt(getHeaderValue(record.headers(), "type")),
-                parseInt(getHeaderValue(record.headers(), "version")));
-        HandlerAdapter<?> adapter = handlers.get(type);
+        Class<?> type;
+        HandlerAdapter<?> adapter;
+        try {
+            type = Types.getType(
+                    parseInt(getHeaderValue(record.headers(), "type")),
+                    parseInt(getHeaderValue(record.headers(), "version")));
+            adapter = handlers.get(type);
+        } catch (RuntimeException e) {
+            LOG.info("Ignoring unknown message");
+            return;
+        }
         if (adapter != null) {
             try {
                 handleRecord(adapter, record);

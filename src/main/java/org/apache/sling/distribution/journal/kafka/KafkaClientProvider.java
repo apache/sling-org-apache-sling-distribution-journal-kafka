@@ -79,6 +79,10 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     public static final int PARTITION = 0;
 
+    private static final String SECURITY_PROTOCOL = "security.protocol";
+    private static final String SASL_MECHANISM = "sasl.mechanism";
+    private static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
+
     private volatile KafkaProducer<String, byte[]> rawProducer = null;
 
     private volatile KafkaProducer<String, String> jsonProducer = null;
@@ -89,11 +93,20 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     private int defaultApiTimeout;
 
+    private String securityProtocol;
+
+    private String saslMechanism;
+
+    private String saslJaasConfig;
+
     @Activate
     public void activate(KafkaEndpoint kafkaEndpoint) {
         kafkaBootstrapServers = requireNonNull(kafkaEndpoint.kafkaBootstrapServers());
         requestTimeout = kafkaEndpoint.kafkaRequestTimeout();
         defaultApiTimeout = kafkaEndpoint.kafkaDefaultApiTimeout();
+        securityProtocol = kafkaEndpoint.securityProtocol().name;
+        saslMechanism = kafkaEndpoint.saslMechanism();
+        saslJaasConfig = kafkaEndpoint.saslJaasConfig();
     }
     
     @Deactivate
@@ -187,7 +200,13 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     protected <T> KafkaConsumer<String, T> createConsumer(Class<? extends Deserializer<?>> deserializer, Reset reset) {
         String groupId = UUID.randomUUID().toString();
-        return new KafkaConsumer<>(consumerConfig(deserializer, groupId, reset));
+        ClassLoader oldClassloader = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(KafkaConsumer.class.getClassLoader());
+        try {
+            return new KafkaConsumer<>(consumerConfig(deserializer, groupId, reset));
+        } finally {
+            Thread.currentThread().setContextClassLoader(oldClassloader);
+        }
     }
 
     private void closeQuietly(final Closeable closeable) {
@@ -203,6 +222,14 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     @Nonnull
     private synchronized KafkaProducer<String, byte[]> buildKafkaProducer() {
         if (rawProducer == null) {
+            ClassLoader oldClassloader = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(KafkaProducer.class.getClassLoader());
+            try {
+                rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
+            } finally {
+                Thread.currentThread().setContextClassLoader(oldClassloader);
+            }
+
             rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
         }
         return rawProducer;
@@ -217,8 +244,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
 
     private Map<String, Object> consumerConfig(Object deserializer, String consumerGroupId, Reset reset) {
-        Map<String, Object> config = new HashMap<>();
-        config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
+        Map<String, Object> config = commonConfig();
         config.put(GROUP_ID_CONFIG, consumerGroupId);
         config.put(ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(DEFAULT_API_TIMEOUT_MS_CONFIG, defaultApiTimeout);
@@ -229,13 +255,21 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
 
     private Map<String, Object> producerConfig(Object serializer) {
-        Map<String, Object> config = new HashMap<>();
+        Map<String, Object> config = commonConfig();
+        config.put(REQUEST_TIMEOUT_MS_CONFIG, requestTimeout);
         config.put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(VALUE_SERIALIZER_CLASS_CONFIG, serializer);
-        config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
-        config.put(REQUEST_TIMEOUT_MS_CONFIG, requestTimeout);
         config.put(ACKS_CONFIG, "all");
         return unmodifiableMap(config);
+    }
+
+    private Map<String, Object> commonConfig() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
+        config.put(SASL_MECHANISM, saslMechanism);
+        config.put(SECURITY_PROTOCOL,  securityProtocol);
+        config.put(SASL_JAAS_CONFIG, saslJaasConfig);
+        return config;
     }
 
     private long offset(String assign) {
