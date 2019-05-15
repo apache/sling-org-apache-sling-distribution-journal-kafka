@@ -33,6 +33,8 @@ import static org.apache.kafka.clients.producer.ProducerConfig.ACKS_CONFIG;
 import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG;
 import static org.apache.kafka.clients.producer.ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG;
 import static org.apache.kafka.clients.producer.ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG;
+import static org.apache.kafka.common.config.SaslConfigs.SASL_JAAS_CONFIG;
+import static org.apache.kafka.common.config.SaslConfigs.SASL_MECHANISM;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -80,8 +82,6 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     public static final int PARTITION = 0;
 
     private static final String SECURITY_PROTOCOL = "security.protocol";
-    private static final String SASL_MECHANISM = "sasl.mechanism";
-    private static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
     private volatile KafkaProducer<String, byte[]> rawProducer = null;
 
@@ -104,9 +104,9 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         kafkaBootstrapServers = requireNonNull(kafkaEndpoint.kafkaBootstrapServers());
         requestTimeout = kafkaEndpoint.kafkaRequestTimeout();
         defaultApiTimeout = kafkaEndpoint.kafkaDefaultApiTimeout();
-        securityProtocol = kafkaEndpoint.securityProtocol().name;
+        securityProtocol = kafkaEndpoint.securityProtocol();
         saslMechanism = kafkaEndpoint.saslMechanism();
-        saslJaasConfig = kafkaEndpoint.saslJaasConfig();
+        saslJaasConfig = kafkaEndpoint.saslJaasConfig().isEmpty() ? null : kafkaEndpoint.saslJaasConfig();
     }
     
     @Deactivate

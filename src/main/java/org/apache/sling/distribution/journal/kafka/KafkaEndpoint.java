@@ -18,7 +18,6 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
-import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
@@ -40,11 +39,11 @@ public @interface KafkaEndpoint {
     
     @AttributeDefinition(name = "Security protocol",
             description = "e.g. SASL_SSL")
-    SecurityProtocol securityProtocol() default SecurityProtocol.PLAINTEXT;
+    String securityProtocol() default "PLAINTEXT";
     
     @AttributeDefinition(name = "Sasl mechanism",
             description = "e.g. PLAIN")
-    String saslMechanism() default "";
+    String saslMechanism() default "GSSAPI";
     
     @AttributeDefinition(name = "Sasl jaas config",
             description = "")
