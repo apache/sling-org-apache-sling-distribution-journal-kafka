@@ -106,7 +106,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         defaultApiTimeout = kafkaEndpoint.kafkaDefaultApiTimeout();
         securityProtocol = kafkaEndpoint.securityProtocol();
         saslMechanism = kafkaEndpoint.saslMechanism();
-        saslJaasConfig = kafkaEndpoint.saslJaasConfig().isEmpty() ? null : kafkaEndpoint.saslJaasConfig();
+        saslJaasConfig = kafkaEndpoint.saslJaasConfig();
     }
     
     @Deactivate
@@ -268,7 +268,9 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
         config.put(SASL_MECHANISM, saslMechanism);
         config.put(SECURITY_PROTOCOL,  securityProtocol);
-        config.put(SASL_JAAS_CONFIG, saslJaasConfig);
+        if (!saslJaasConfig.isEmpty()) {
+            config.put(SASL_JAAS_CONFIG, saslJaasConfig);
+        }
         return config;
     }
 
