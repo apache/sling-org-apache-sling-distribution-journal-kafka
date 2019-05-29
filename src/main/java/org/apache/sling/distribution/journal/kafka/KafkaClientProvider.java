@@ -22,6 +22,7 @@ import static java.lang.String.format;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
+import static org.apache.kafka.clients.CommonClientConfigs.SECURITY_PROTOCOL_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG;
@@ -80,8 +81,6 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(KafkaClientProvider.class);
 
     public static final int PARTITION = 0;
-
-    private static final String SECURITY_PROTOCOL = "security.protocol";
 
     private volatile KafkaProducer<String, byte[]> rawProducer = null;
 
@@ -267,7 +266,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         Map<String, Object> config = new HashMap<>();
         config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
         config.put(SASL_MECHANISM, saslMechanism);
-        config.put(SECURITY_PROTOCOL,  securityProtocol);
+        config.put(SECURITY_PROTOCOL_CONFIG, securityProtocol);
         if (!saslJaasConfig.isEmpty()) {
             config.put(SASL_JAAS_CONFIG, saslJaasConfig);
         }
