@@ -21,29 +21,24 @@ package org.apache.sling.distribution.journal.kafka.util;
 import java.util.Map;
 
 import org.apache.sling.distribution.journal.kafka.KafkaEndpoint;
+import org.osgi.util.converter.Converter;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.osgi.util.converter.Converters.standardConverter;
 
 public class KafkaEndpointBuilder {
 
+    /**
+     * Custom converter that return null instead of throwing ConversionException
+     * for properties with null default. See FELIX-6137.
+     */
+    private static final Converter CONVERTER = standardConverter()
+            .newConverterBuilder()
+            .errorHandler((o,t) -> null)
+            .build();
+
     public static KafkaEndpoint buildKafkaEndpoint(Map<String, Object> props) {
-
-        /*
-         * The standardConverter does not support null default
-         * Until FELIX-6137 is fixed, we use this 'creative' way
-         * to build KafkaEndpoint.
-         */
-
-        KafkaEndpoint proxy = standardConverter().convert(props).to(KafkaEndpoint.class);
-        KafkaEndpoint endpoint = mock(KafkaEndpoint.class);
-        when(endpoint.saslJaasConfig()).thenReturn(null);
-        when(endpoint.securityProtocol()).thenReturn(proxy.securityProtocol());
-        when(endpoint.kafkaBootstrapServers()).thenReturn(proxy.kafkaBootstrapServers());
-        when(endpoint.kafkaDefaultApiTimeout()).thenReturn(proxy.kafkaDefaultApiTimeout());
-        when(endpoint.kafkaRequestTimeout()).thenReturn(proxy.kafkaRequestTimeout());
-        when(endpoint.saslMechanism()).thenReturn(proxy.saslMechanism());
-        return endpoint;
+        return CONVERTER.convert(props).to(KafkaEndpoint.class);
     }
+
+
 }
