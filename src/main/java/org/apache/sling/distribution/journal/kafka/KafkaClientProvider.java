@@ -267,9 +267,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
         config.put(SASL_MECHANISM, saslMechanism);
         config.put(SECURITY_PROTOCOL_CONFIG, securityProtocol);
-        if (!saslJaasConfig.isEmpty()) {
-            config.put(SASL_JAAS_CONFIG, saslJaasConfig);
-        }
+        config.put(SASL_JAAS_CONFIG, saslJaasConfig);
         return config;
     }
 

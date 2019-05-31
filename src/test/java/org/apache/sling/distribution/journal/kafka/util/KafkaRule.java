@@ -18,9 +18,8 @@
  */
 package org.apache.sling.distribution.journal.kafka.util;
 
-import static org.osgi.util.converter.Converters.standardConverter;
+import static org.apache.sling.distribution.journal.kafka.util.KafkaEndpointBuilder.buildKafkaEndpoint;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,7 +45,7 @@ public class KafkaRule implements TestRule {
         };
     }
 
-    private void runWithKafka(Statement base) throws Throwable, IOException, Exception {
+    private void runWithKafka(Statement base) throws Throwable {
         try (KafkaLocal kafka = new KafkaLocal()) {
             this.provider = createProvider();
             base.evaluate();
@@ -56,10 +55,10 @@ public class KafkaRule implements TestRule {
 
     private KafkaClientProvider createProvider() {
         KafkaClientProvider provider = new KafkaClientProvider();
-        
-        Map<String, String> props = new HashMap<>();
+
+        Map<String, Object> props = new HashMap<>();
         props.put("connectTimeout", "5000");
-        KafkaEndpoint config = standardConverter().convert(props).to(KafkaEndpoint.class);
+        KafkaEndpoint config = buildKafkaEndpoint(props);
         provider.activate(config);
         return provider;
     }

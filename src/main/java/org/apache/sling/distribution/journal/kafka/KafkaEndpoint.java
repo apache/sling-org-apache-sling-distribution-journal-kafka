@@ -22,7 +22,7 @@ import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 @ObjectClassDefinition(name = "Apache Sling Journal Distribution - Kafka endpoint",
-        description = "Apache Kafka Endpoint")
+        description = "Apache Kafka Endpoint. Default values match Kafka properties defaults.")
 public @interface KafkaEndpoint {
 
     @AttributeDefinition(name = "Kafka Bootstrap Servers",
@@ -37,16 +37,16 @@ public @interface KafkaEndpoint {
             description = "Kafka Default API Timeout in ms.")
     int kafkaDefaultApiTimeout() default 60000;
     
-    @AttributeDefinition(name = "Security protocol",
-            description = "e.g. SASL_SSL")
+    @AttributeDefinition(name = "Kafka Security protocol",
+            description = "Kafka Protocol used to communicate with brokers.")
     String securityProtocol() default "PLAINTEXT";
     
-    @AttributeDefinition(name = "Sasl mechanism",
-            description = "e.g. PLAIN")
+    @AttributeDefinition(name = "Kafka SASL mechanism",
+            description = "Kafka SASL mechanism used for client connections.")
     String saslMechanism() default "GSSAPI";
     
-    @AttributeDefinition(name = "Sasl jaas config",
-            description = "")
-    String saslJaasConfig() default "";
+    @AttributeDefinition(name = "Kafka SASL JAAS config",
+            description = "Kafka JAAS login context parameters for SASL connections in the format used by JAAS configuration files.")
+    String saslJaasConfig();
 
 }

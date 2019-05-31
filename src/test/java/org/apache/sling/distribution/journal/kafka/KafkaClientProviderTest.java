@@ -18,11 +18,12 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
+import static java.util.Collections.emptyMap;
+import static org.apache.sling.distribution.journal.kafka.util.KafkaEndpointBuilder.buildKafkaEndpoint;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
-import static org.osgi.util.converter.Converters.standardConverter;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,13 +57,13 @@ public class KafkaClientProviderTest {
     @Before
     public void before() {
         doReturn(consumer).when(provider).createConsumer(Mockito.any(), Mockito.any());
-        KafkaEndpoint config = createConfig();
+        KafkaEndpoint config = buildKafkaEndpoint(emptyMap());
         provider.activate(config);
     }
 
     @Test
     public void testAssertTopicWhenDoesNotExist() throws Exception {
-        when(consumer.listTopics()).thenReturn(Collections.emptyMap());
+        when(consumer.listTopics()).thenReturn(emptyMap());
         try {
             provider.assertTopic(TOPIC);
             Assert.fail();
@@ -112,11 +113,5 @@ public class KafkaClientProviderTest {
     public void testAssignTo() throws Exception {
         String assign = provider.assignTo(1l);
         assertThat(assign, equalTo("0:1"));
-    }
-
-    private KafkaEndpoint createConfig() {
-        Map<String, String> props = new HashMap<>();
-        KafkaEndpoint config = standardConverter().convert(props).to(KafkaEndpoint.class);
-        return config;
     }
 }
