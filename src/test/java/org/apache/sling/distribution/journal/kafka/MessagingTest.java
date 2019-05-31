@@ -49,16 +49,17 @@ public class MessagingTest {
     
     @ClassRule
     public static KafkaRule kafka = new KafkaRule();
+    private MessagingProvider provider;
     
     @Before
     public void before() {
         MockitoAnnotations.initMocks(this);
         topicName = "MessagingTest" + UUID.randomUUID().toString();
+        this.provider = kafka.getProvider();
     }
     
     @Test
     public void testSendReceive() throws Exception {
-        MessagingProvider provider = kafka.getProvider();
         HandlerAdapter<DiscoveryMessage> handler = HandlerAdapter.create(DiscoveryMessage.class, this::handle);
         Closeable poller = provider.createPoller(topicName, Reset.earliest, handler);
         DiscoveryMessage msg = DiscoveryMessage.newBuilder()
@@ -72,16 +73,14 @@ public class MessagingTest {
                 .build();
         MessageSender<DiscoveryMessage> messageSender = provider.createSender();
         
-        // After starting Kafka, sending and receiving should work
         messageSender.send(topicName, msg);
-        assertReceived();
+        assertReceived("Consumer started from earliest .. should see our message");
 
         poller.close();
     }
     
     @Test
     public void testAssign() throws Exception {
-        MessagingProvider provider = kafka.getProvider();
         DiscoveryMessage msg = DiscoveryMessage.newBuilder()
                 .setSubAgentName("sub1agent")
                 .setSubSlingId("subsling")
@@ -95,37 +94,34 @@ public class MessagingTest {
         messageSender.send(topicName, msg);
         
         HandlerAdapter<DiscoveryMessage> handler = HandlerAdapter.create(DiscoveryMessage.class, this::handle);
-        long offset;
         try (Closeable poller = provider.createPoller(topicName, Reset.earliest, handler)) {
-            assertReceived();
-            offset = lastInfo.getOffset();
+            assertReceived("Starting from earliest .. should see our message");
         }
+        long offset = lastInfo.getOffset();
         
-        // Starting from old offset .. should see our message
         String assign = "0:" + offset;
         try (Closeable poller = provider.createPoller(topicName, Reset.latest, assign, handler)) {
-            assertReceived();
+            assertReceived("Starting from old offset .. should see our message");
             assertThat(lastInfo.getOffset(), equalTo(offset));
         }
         
-        // Starting from invalid offset. Should see old message as we start from earliest
         String invalid = "0:32532523453";
-        try (Closeable poller = provider.createPoller(topicName, Reset.earliest, invalid, handler)) {
-            assertReceived();
+        try (Closeable poller1 = provider.createPoller(topicName, Reset.latest, invalid, handler)) {
+            assertNotReceived("Should see old message as we start from earliest");
         }
         
-        // Starting from invalid offset. Should not see any message as we start from latest
-        try (Closeable poller = provider.createPoller(topicName, Reset.latest, invalid, handler)) {
-            assertNotReceived();
+        String invalid1 = "0:32532523453";
+        try (Closeable poller2 = provider.createPoller(topicName, Reset.earliest, invalid1, handler)) {
+            assertReceived("Should not see any message as we start from latest");
         }
     }
 
-    private void assertReceived() throws InterruptedException {
-        assertTrue(sem.tryAcquire(30, TimeUnit.SECONDS));
+    private void assertReceived(String message) throws InterruptedException {
+        assertTrue(message, sem.tryAcquire(30, TimeUnit.SECONDS));
     }
     
-    private void assertNotReceived() throws InterruptedException {
-        assertFalse(sem.tryAcquire(2, TimeUnit.SECONDS));
+    private void assertNotReceived(String message) throws InterruptedException {
+        assertFalse(message, sem.tryAcquire(2, TimeUnit.SECONDS));
     }
 
     private void handle(MessageInfo info, DiscoveryMessage message) {

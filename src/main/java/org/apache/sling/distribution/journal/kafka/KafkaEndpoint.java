@@ -36,4 +36,17 @@ public @interface KafkaEndpoint {
     @AttributeDefinition(name = "Kafka Default API Timeout",
             description = "Kafka Default API Timeout in ms.")
     int kafkaDefaultApiTimeout() default 60000;
+    
+    @AttributeDefinition(name = "Security protocol",
+            description = "e.g. SASL_SSL")
+    String securityProtocol() default "PLAINTEXT";
+    
+    @AttributeDefinition(name = "Sasl mechanism",
+            description = "e.g. PLAIN")
+    String saslMechanism() default "GSSAPI";
+    
+    @AttributeDefinition(name = "Sasl jaas config",
+            description = "")
+    String saslJaasConfig() default "";
+
 }

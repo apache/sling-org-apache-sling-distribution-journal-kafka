@@ -22,6 +22,7 @@ import static java.lang.String.format;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
+import static org.apache.kafka.clients.CommonClientConfigs.SECURITY_PROTOCOL_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG;
@@ -33,6 +34,8 @@ import static org.apache.kafka.clients.producer.ProducerConfig.ACKS_CONFIG;
 import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG;
 import static org.apache.kafka.clients.producer.ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG;
 import static org.apache.kafka.clients.producer.ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG;
+import static org.apache.kafka.common.config.SaslConfigs.SASL_JAAS_CONFIG;
+import static org.apache.kafka.common.config.SaslConfigs.SASL_MECHANISM;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -89,11 +92,20 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     private int defaultApiTimeout;
 
+    private String securityProtocol;
+
+    private String saslMechanism;
+
+    private String saslJaasConfig;
+
     @Activate
     public void activate(KafkaEndpoint kafkaEndpoint) {
         kafkaBootstrapServers = requireNonNull(kafkaEndpoint.kafkaBootstrapServers());
         requestTimeout = kafkaEndpoint.kafkaRequestTimeout();
         defaultApiTimeout = kafkaEndpoint.kafkaDefaultApiTimeout();
+        securityProtocol = kafkaEndpoint.securityProtocol();
+        saslMechanism = kafkaEndpoint.saslMechanism();
+        saslJaasConfig = kafkaEndpoint.saslJaasConfig();
     }
     
     @Deactivate
@@ -187,7 +199,13 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     protected <T> KafkaConsumer<String, T> createConsumer(Class<? extends Deserializer<?>> deserializer, Reset reset) {
         String groupId = UUID.randomUUID().toString();
-        return new KafkaConsumer<>(consumerConfig(deserializer, groupId, reset));
+        ClassLoader oldClassloader = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(KafkaConsumer.class.getClassLoader());
+        try {
+            return new KafkaConsumer<>(consumerConfig(deserializer, groupId, reset));
+        } finally {
+            Thread.currentThread().setContextClassLoader(oldClassloader);
+        }
     }
 
     private void closeQuietly(final Closeable closeable) {
@@ -203,6 +221,14 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     @Nonnull
     private synchronized KafkaProducer<String, byte[]> buildKafkaProducer() {
         if (rawProducer == null) {
+            ClassLoader oldClassloader = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(KafkaProducer.class.getClassLoader());
+            try {
+                rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
+            } finally {
+                Thread.currentThread().setContextClassLoader(oldClassloader);
+            }
+
             rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
         }
         return rawProducer;
@@ -217,8 +243,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
 
     private Map<String, Object> consumerConfig(Object deserializer, String consumerGroupId, Reset reset) {
-        Map<String, Object> config = new HashMap<>();
-        config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
+        Map<String, Object> config = commonConfig();
         config.put(GROUP_ID_CONFIG, consumerGroupId);
         config.put(ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(DEFAULT_API_TIMEOUT_MS_CONFIG, defaultApiTimeout);
@@ -229,13 +254,23 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
 
     private Map<String, Object> producerConfig(Object serializer) {
-        Map<String, Object> config = new HashMap<>();
+        Map<String, Object> config = commonConfig();
+        config.put(REQUEST_TIMEOUT_MS_CONFIG, requestTimeout);
         config.put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(VALUE_SERIALIZER_CLASS_CONFIG, serializer);
-        config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
-        config.put(REQUEST_TIMEOUT_MS_CONFIG, requestTimeout);
         config.put(ACKS_CONFIG, "all");
         return unmodifiableMap(config);
+    }
+
+    private Map<String, Object> commonConfig() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
+        config.put(SASL_MECHANISM, saslMechanism);
+        config.put(SECURITY_PROTOCOL_CONFIG, securityProtocol);
+        if (!saslJaasConfig.isEmpty()) {
+            config.put(SASL_JAAS_CONFIG, saslJaasConfig);
+        }
+        return config;
     }
 
     private long offset(String assign) {
