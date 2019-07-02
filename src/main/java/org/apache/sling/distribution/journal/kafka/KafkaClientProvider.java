@@ -225,14 +225,9 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     @Nonnull
     private synchronized KafkaProducer<String, byte[]> buildKafkaProducer() {
         if (rawProducer == null) {
-            ClassLoader oldClassloader = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(KafkaProducer.class.getClassLoader());
-            try {
+            try (CLSwitch switcher = new CLSwitch(KafkaProducer.class.getClassLoader())) {
                 rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
-            } finally {
-                Thread.currentThread().setContextClassLoader(oldClassloader);
             }
-
             rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
         }
         return rawProducer;
