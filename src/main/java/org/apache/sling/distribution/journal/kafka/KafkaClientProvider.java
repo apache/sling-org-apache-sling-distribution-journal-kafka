@@ -90,9 +90,9 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     private ExceptionEventSender eventSender;
 
-    private volatile KafkaProducer<String, byte[]> rawProducer = null;
+    private KafkaProducer<String, byte[]> rawProducer = null;
 
-    private volatile KafkaProducer<String, String> jsonProducer = null;
+    private KafkaProducer<String, String> jsonProducer = null;
 
     private String kafkaBootstrapServers;
 
@@ -118,7 +118,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
     
     @Deactivate
-    public void close() {
+    public synchronized void close() {
         closeQuietly(rawProducer);
         closeQuietly(jsonProducer);
     }
