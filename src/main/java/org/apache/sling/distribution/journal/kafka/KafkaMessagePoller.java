@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.sling.distribution.journal.messages.Types;
+import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.HandlerAdapter;
 import org.apache.sling.distribution.journal.MessageInfo;
 import com.google.protobuf.ByteString;
@@ -40,6 +41,7 @@ import static java.lang.Integer.parseInt;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.Duration.ofHours;
+import static java.util.Objects.requireNonNull;
 
 public class KafkaMessagePoller implements Closeable {
 
@@ -53,8 +55,11 @@ public class KafkaMessagePoller implements Closeable {
 
     private final String types;
 
-    public KafkaMessagePoller(KafkaConsumer<String, byte[]> consumer, HandlerAdapter<?>... handlerAdapters) {
-        this.consumer = consumer;
+    private final ExceptionEventSender eventSender;
+
+    public KafkaMessagePoller(KafkaConsumer<String, byte[]> consumer, ExceptionEventSender eventSender, HandlerAdapter<?>... handlerAdapters) {
+        this.consumer = requireNonNull(consumer);
+        this.eventSender = requireNonNull(eventSender);
         for (HandlerAdapter<?> handlerAdapter : handlerAdapters) {
             handlers.put(handlerAdapter.getType(), handlerAdapter);
         }
@@ -112,6 +117,7 @@ public class KafkaMessagePoller implements Closeable {
             try {
                 handleRecord(adapter, record);
             } catch (Exception e) {
+                eventSender.send(e);
                 String msg = format("Error consuming message for types %s", types);
                 LOG.warn(msg);
             }

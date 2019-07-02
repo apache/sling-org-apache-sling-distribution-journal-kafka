@@ -39,15 +39,21 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.osgi.service.event.EventAdmin;
 
 @RunWith(MockitoJUnitRunner.class)
 public class KafkaClientProviderTest {
     private static final String TOPIC = "topic";
     
+    @Mock
+    EventAdmin eventAdmin;
+    
+    @InjectMocks
     @Spy
     private KafkaClientProvider provider;
     

@@ -25,6 +25,7 @@ import static org.apache.sling.distribution.journal.kafka.KafkaClientProvider.PA
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.JsonMessageSender;
 import org.apache.sling.distribution.journal.MessagingException;
 import org.slf4j.Logger;
@@ -41,7 +42,10 @@ public class KafkaJsonMessageSender<T> implements JsonMessageSender<T> {
 
     private final KafkaProducer<String, String> producer;
 
-    public KafkaJsonMessageSender(KafkaProducer<String, String> producer) {
+    private final ExceptionEventSender eventSender;
+
+    public KafkaJsonMessageSender(KafkaProducer<String, String> producer, ExceptionEventSender eventSender) {
+        this.eventSender = eventSender;
         this.producer = requireNonNull(producer);
     }
 
@@ -57,6 +61,7 @@ public class KafkaJsonMessageSender<T> implements JsonMessageSender<T> {
             RecordMetadata metadata = producer.send(record).get();
             LOG.info(format("Sent JSON to %s", metadata));
         } catch (Exception e) {
+            eventSender.send(e);
             throw new MessagingException(format("Failed to send JSON message on topic %s", topic), e);
         }
     }

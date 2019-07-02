@@ -31,7 +31,6 @@ import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 
 public class KafkaRule implements TestRule {
-
     private KafkaClientProvider provider;
 
     @Override

@@ -21,6 +21,7 @@ package org.apache.sling.distribution.journal.kafka;
 import java.io.Closeable;
 import java.io.IOException;
 
+import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.MessageHandler;
 import org.apache.sling.distribution.journal.MessageInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.sling.distribution.journal.RunnableUtil.startBackgroundThread;
 import static java.lang.String.format;
 import static java.time.Duration.ofHours;
+import static java.util.Objects.requireNonNull;
 
 public class KafkaJsonMessagePoller<T> implements Closeable {
 
@@ -47,11 +49,14 @@ public class KafkaJsonMessagePoller<T> implements Closeable {
 
     private final ObjectReader reader;
 
-    public KafkaJsonMessagePoller(KafkaConsumer<String, String> consumer, MessageHandler<T> handler, Class<T> clazz) {
-        this.consumer = consumer;
-        this.handler = handler;
+    private final ExceptionEventSender eventSender;
+
+    public KafkaJsonMessagePoller(KafkaConsumer<String, String> consumer, ExceptionEventSender eventSender, MessageHandler<T> handler, Class<T> clazz) {
+        this.consumer = requireNonNull(consumer);
+        this.eventSender = requireNonNull(eventSender);
+        this.handler = requireNonNull(handler);
         ObjectMapper mapper = new ObjectMapper();
-        reader = mapper.readerFor(clazz);
+        reader = mapper.readerFor(requireNonNull(clazz));
         startBackgroundThread(this::run, format("Message Json Poller for handler %s", handler));
     }
 
@@ -96,6 +101,7 @@ public class KafkaJsonMessagePoller<T> implements Closeable {
             T message = reader.readValue(payload);
             handler.handle(info, message);
         } catch (IOException e) {
+            eventSender.send(e);
             LOG.error("Failed to parse payload {}", payload);
         }
     }

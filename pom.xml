@@ -83,6 +83,11 @@
             <artifactId>org.osgi.service.metatype.annotations</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.cmpn</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <!-- Apache Kafka -->
         <dependency>
             <groupId>org.apache.servicemix.bundles</groupId>

@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.sling.distribution.journal.messages.Types;
+import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.MessageSender;
 import org.apache.sling.distribution.journal.MessagingException;
 import com.google.protobuf.GeneratedMessage;
@@ -44,7 +45,10 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
 
     private final KafkaProducer<String, byte[]> producer;
 
-    public KafkaMessageSender(KafkaProducer<String, byte[]> producer) {
+    private final ExceptionEventSender eventSender;
+
+    public KafkaMessageSender(KafkaProducer<String, byte[]> producer, ExceptionEventSender eventSender) {
+        this.eventSender = requireNonNull(eventSender);
         this.producer = requireNonNull(producer);
     }
 
@@ -63,6 +67,7 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
             RecordMetadata metadata = producer.send(record).get();
             LOG.info(format("Sent to %s", metadata));
         } catch (InterruptedException | ExecutionException e) {
+            eventSender.send(e);
             throw new MessagingException(format("Failed to send message on topic %s", topic), e);
         }
     }

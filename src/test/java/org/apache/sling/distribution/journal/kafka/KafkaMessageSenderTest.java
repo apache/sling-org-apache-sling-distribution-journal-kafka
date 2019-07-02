@@ -26,6 +26,7 @@ import java.util.concurrent.Future;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.MessagingException;
 import org.apache.sling.distribution.journal.messages.Messages.ClearCommand;
 import org.apache.sling.distribution.journal.messages.Messages.PingMessage;
@@ -43,6 +44,9 @@ public class KafkaMessageSenderTest {
 
     private static final String TOPIC = "topic";
 
+    @Mock
+    private ExceptionEventSender eventSender;
+    
     @Mock
     private KafkaProducer<String, byte[]> producer;
     

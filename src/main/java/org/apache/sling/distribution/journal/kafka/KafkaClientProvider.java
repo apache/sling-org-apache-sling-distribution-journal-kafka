@@ -57,6 +57,7 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.HandlerAdapter;
 import org.apache.sling.distribution.journal.JsonMessageSender;
 import org.apache.sling.distribution.journal.MessageHandler;
@@ -68,6 +69,8 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.event.EventAdmin;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +84,11 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(KafkaClientProvider.class);
 
     public static final int PARTITION = 0;
+    
+    @Reference
+    private EventAdmin eventAdmin;
+
+    private ExceptionEventSender eventSender;
 
     private volatile KafkaProducer<String, byte[]> rawProducer = null;
 
@@ -100,6 +108,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     @Activate
     public void activate(KafkaEndpoint kafkaEndpoint) {
+        eventSender = new ExceptionEventSender(eventAdmin);
         kafkaBootstrapServers = requireNonNull(kafkaEndpoint.kafkaBootstrapServers());
         requestTimeout = kafkaEndpoint.kafkaRequestTimeout();
         defaultApiTimeout = kafkaEndpoint.kafkaDefaultApiTimeout();
@@ -116,7 +125,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     @Override
     public <T extends GeneratedMessage> MessageSender<T> createSender() {
-        return new KafkaMessageSender<>(buildKafkaProducer());
+        return new KafkaMessageSender<>(buildKafkaProducer(), eventSender);
     }
 
     @Override
@@ -137,14 +146,14 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         } else {
             consumer.seekToEnd(topicPartitions);
         }
-        Closeable poller = new KafkaMessagePoller(consumer, adapters);
+        Closeable poller = new KafkaMessagePoller(consumer, eventSender, adapters);
         LOG.info("Created poller for reset {}, topicName {}, assign {}", reset, topicName, assign);
         return poller;
     }
 
     @Override
     public <T> JsonMessageSender<T> createJsonSender() {
-        return new KafkaJsonMessageSender<>(buildJsonKafkaProducer());
+        return new KafkaJsonMessageSender<>(buildJsonKafkaProducer(), eventSender);
     }
 
     @Override
@@ -158,7 +167,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         } else {
             consumer.seekToEnd(topicPartitions);
         }
-        return new KafkaJsonMessagePoller<>(consumer, handler, type);
+        return new KafkaJsonMessagePoller<>(consumer, eventSender, handler, type);
     }
 
     @Override
