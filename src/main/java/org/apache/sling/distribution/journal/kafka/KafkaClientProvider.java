@@ -185,11 +185,10 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     @Override
     public long retrieveOffset(String topicName, Reset reset) {
-        try (KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, reset)) {;
+        try (KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, reset)) {
             TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
             Map<TopicPartition, Long> offsets = getOffsets(reset, consumer, topicPartition);
-            Long offset = offsets.get(topicPartition);
-            return offset;
+            return offsets.get(topicPartition);
         }
     }
 
@@ -208,12 +207,8 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     protected <T> KafkaConsumer<String, T> createConsumer(Class<? extends Deserializer<?>> deserializer, Reset reset) {
         String groupId = UUID.randomUUID().toString();
-        ClassLoader oldClassloader = Thread.currentThread().getContextClassLoader();
-        Thread.currentThread().setContextClassLoader(KafkaConsumer.class.getClassLoader());
-        try {
+        try (CLSwitch switcher = new CLSwitch(KafkaConsumer.class.getClassLoader())) {
             return new KafkaConsumer<>(consumerConfig(deserializer, groupId, reset));
-        } finally {
-            Thread.currentThread().setContextClassLoader(oldClassloader);
         }
     }
 
