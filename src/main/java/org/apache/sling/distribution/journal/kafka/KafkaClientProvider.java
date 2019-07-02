@@ -212,7 +212,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         }
     }
 
-    private void closeQuietly(final Closeable closeable) {
+    private void closeQuietly(Closeable closeable) {
         try {
             if (closeable != null) {
                 closeable.close();
