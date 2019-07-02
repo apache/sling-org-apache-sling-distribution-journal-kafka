@@ -19,7 +19,6 @@
 package org.apache.sling.distribution.journal.kafka;
 
 import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
 
 import org.apache.sling.distribution.journal.messages.Types;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
@@ -66,10 +65,17 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
         try {
             RecordMetadata metadata = producer.send(record).get();
             LOG.info(format("Sent to %s", metadata));
-        } catch (InterruptedException | ExecutionException e) {
-            eventSender.send(e);
-            throw new MessagingException(format("Failed to send message on topic %s", topic), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            handleException(topic, e);
+        } catch (Exception e) {
+            handleException(topic, e);
         }
+    }
+
+    private void handleException(String topic, Exception e) {
+        eventSender.send(e);
+        throw new MessagingException(format("Failed to send message on topic %s", topic), e);
     }
 
     private Iterable<Header> toHeaders(int type, int version) {
