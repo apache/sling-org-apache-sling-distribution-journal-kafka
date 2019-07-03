@@ -62,34 +62,19 @@ public class MessagingTest {
     public void testSendReceive() throws Exception {
         HandlerAdapter<DiscoveryMessage> handler = HandlerAdapter.create(DiscoveryMessage.class, this::handle);
         Closeable poller = provider.createPoller(topicName, Reset.earliest, handler);
-        DiscoveryMessage msg = DiscoveryMessage.newBuilder()
-                .setSubAgentName("sub1agent")
-                .setSubSlingId("subsling")
-                .setSubscriberConfiguration(SubscriberConfiguration
-                        .newBuilder()
-                        .setEditable(false)
-                        .setMaxRetries(-1)
-                        .build())
-                .build();
         MessageSender<DiscoveryMessage> messageSender = provider.createSender();
         
-        messageSender.send(topicName, msg);
+        messageSender.send(topicName, createMessage());
         assertReceived("Consumer started from earliest .. should see our message");
+        messageSender.send(topicName, createMessage());
+        assertReceived("Should also consume a second message");
 
         poller.close();
     }
     
     @Test
     public void testAssign() throws Exception {
-        DiscoveryMessage msg = DiscoveryMessage.newBuilder()
-                .setSubAgentName("sub1agent")
-                .setSubSlingId("subsling")
-                .setSubscriberConfiguration(SubscriberConfiguration
-                        .newBuilder()
-                        .setEditable(false)
-                        .setMaxRetries(-1)
-                        .build())
-                .build();
+        DiscoveryMessage msg = createMessage();
         MessageSender<DiscoveryMessage> messageSender = provider.createSender();
         messageSender.send(topicName, msg);
         
@@ -114,6 +99,18 @@ public class MessagingTest {
         try (Closeable poller2 = provider.createPoller(topicName, Reset.earliest, invalid1, handler)) {
             assertReceived("Should not see any message as we start from latest");
         }
+    }
+
+    private DiscoveryMessage createMessage() {
+        return DiscoveryMessage.newBuilder()
+                .setSubAgentName("sub1agent")
+                .setSubSlingId("subsling")
+                .setSubscriberConfiguration(SubscriberConfiguration
+                        .newBuilder()
+                        .setEditable(false)
+                        .setMaxRetries(-1)
+                        .build())
+                .build();
     }
 
     private void assertReceived(String message) throws InterruptedException {
