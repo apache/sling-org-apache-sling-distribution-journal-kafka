@@ -19,6 +19,7 @@
 package org.apache.sling.distribution.journal.kafka;
 
 import static org.hamcrest.Matchers.samePropertyValuesAs;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
@@ -73,8 +74,24 @@ public class JsonMessagingTest {
         poller.close();
     }
     
+    @Test
+    public void testParseError() throws InterruptedException, IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException, SecurityException {
+        MessagingProvider provider = kafka.getProvider();
+        Closeable poller = provider.createJsonPoller(TOPIC_NAME, Reset.earliest, this::handle, Person.class);
+        JsonMessageSender<String> messageSender = provider.createJsonSender();
+        
+        messageSender.send(TOPIC_NAME, "broken");
+        // Log should display "Failed to parse payload"
+        assertNotReceived();
+        poller.close();
+    }
+    
     private void assertReceived() throws InterruptedException {
         assertTrue(sem.tryAcquire(30, TimeUnit.SECONDS));
+    }
+    
+    private void assertNotReceived() throws InterruptedException {
+        assertFalse(sem.tryAcquire(1, TimeUnit.SECONDS));
     }
     
     private void handle(MessageInfo info, Person message) {

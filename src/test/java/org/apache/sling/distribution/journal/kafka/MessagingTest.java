@@ -34,6 +34,7 @@ import org.apache.sling.distribution.journal.MessageSender;
 import org.apache.sling.distribution.journal.MessagingProvider;
 import org.apache.sling.distribution.journal.Reset;
 import org.apache.sling.distribution.journal.kafka.util.KafkaRule;
+import org.apache.sling.distribution.journal.messages.Messages.CommandMessage;
 import org.apache.sling.distribution.journal.messages.Messages.DiscoveryMessage;
 import org.apache.sling.distribution.journal.messages.Messages.SubscriberConfiguration;
 import org.junit.Before;
@@ -50,17 +51,18 @@ public class MessagingTest {
     @ClassRule
     public static KafkaRule kafka = new KafkaRule();
     private MessagingProvider provider;
+    private HandlerAdapter<DiscoveryMessage> handler;
     
     @Before
     public void before() {
         MockitoAnnotations.initMocks(this);
         topicName = "MessagingTest" + UUID.randomUUID().toString();
         this.provider = kafka.getProvider();
+        this.handler = HandlerAdapter.create(DiscoveryMessage.class, this::handle);
     }
     
     @Test
     public void testSendReceive() throws Exception {
-        HandlerAdapter<DiscoveryMessage> handler = HandlerAdapter.create(DiscoveryMessage.class, this::handle);
         Closeable poller = provider.createPoller(topicName, Reset.earliest, handler);
         MessageSender<DiscoveryMessage> messageSender = provider.createSender();
         
@@ -73,12 +75,24 @@ public class MessagingTest {
     }
     
     @Test
+    public void testNoHandler() throws Exception {
+        try (Closeable poller = provider.createPoller(topicName, Reset.earliest, handler)) {
+            MessageSender<CommandMessage> messageSender = provider.createSender();
+            CommandMessage msg = CommandMessage.newBuilder()
+                .setSubSlingId("subslingid")
+                .setSubAgentName("agentname")
+                .build();
+            messageSender.send(topicName, msg);
+            assertNotReceived("Should not be received as we have no handler");
+        }
+    }
+    
+    @Test
     public void testAssign() throws Exception {
         DiscoveryMessage msg = createMessage();
         MessageSender<DiscoveryMessage> messageSender = provider.createSender();
         messageSender.send(topicName, msg);
         
-        HandlerAdapter<DiscoveryMessage> handler = HandlerAdapter.create(DiscoveryMessage.class, this::handle);
         try (Closeable poller = provider.createPoller(topicName, Reset.earliest, handler)) {
             assertReceived("Starting from earliest .. should see our message");
         }
