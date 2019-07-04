@@ -69,29 +69,30 @@ public class KafkaJsonMessagePoller<T> implements Closeable {
 
     public void run() {
         LOG.info("Start JSON poller for handler {}", handler);
-        try {
-            while(running) {
-                consume();
-            }
-        } catch (WakeupException e) {
-            if (running) {
-                LOG.error("Waked up while running {}", e.getMessage(), e);
-                throw e;
-            } else {
+        while(running) {
+            try {
+                consumer.poll(ofHours(1))
+                    .forEach(this::handleRecord);
+            } catch (WakeupException e) {
                 LOG.debug("Waked up while stopping {}", e.getMessage(), e);
+                running = false;
+            } catch(Exception e) {
+                eventSender.send(e);
+                LOG.error("Exception during recieve: {}", e.getMessage(), e);
+                sleepAfterError();
+                // Continue as KafkaConsumer should handle the error transparently
             }
-        } catch(Throwable t) {
-            LOG.error(format("Catch Throwable %s closing consumer", t.getMessage()), t);
-            throw t;
-        } finally {
-            consumer.close();
         }
+        consumer.close();
         LOG.info("Stop JSON poller for handler {}", handler);
     }
-
-    private void consume() {
-        consumer.poll(ofHours(1))
-                .forEach(this::handleRecord);
+    
+    private void sleepAfterError() {
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e1) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void handleRecord(ConsumerRecord<String, String> record) {

@@ -77,25 +77,30 @@ public class KafkaMessagePoller implements Closeable {
 
     public void run() {
         LOG.info("Start poller for types {}", types);
-        try {
-            while(running) {
+        while(running) {
+            try {
                 consumer.poll(ofHours(1))
-                    .forEach(this::handleRecord);
+                .forEach(this::handleRecord);
+            } catch (WakeupException e) {
+                LOG.debug("Waked up {}", e.getMessage(), e);
+                this.running = false;
+            } catch(Exception e) {
+                eventSender.send(e);
+                LOG.error("Exception while receiving from kafka: {}", e.getMessage(), e);
+                sleepAfterError();
+                // Continue as KafkaConsumer should handle the error transparently
             }
-        } catch (WakeupException e) {
-            if (running) {
-                LOG.error("Waked up while running {}", e.getMessage(), e);
-                throw e;
-            } else {
-                LOG.debug("Waked up while stopping {}", e.getMessage(), e);
-            }
-        } catch(Throwable t) {
-            LOG.error(format("Catch Throwable %s closing consumer", t.getMessage()), t);
-            throw t;
-        } finally {
-            consumer.close();
         }
+        consumer.close();
         LOG.info("Stop poller for types {}", types);
+    }
+
+    private void sleepAfterError() {
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e1) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void handleRecord(ConsumerRecord<String, byte[]> record) {
@@ -125,7 +130,6 @@ public class KafkaMessagePoller implements Closeable {
             ByteString payload = ByteString.copyFrom(record.value());
             handler.handle(info, payload);
         } catch (Exception e) {
-            eventSender.send(e);
             String msg = format("Error consuming message for types %s", types);
             LOG.warn(msg);
         }
