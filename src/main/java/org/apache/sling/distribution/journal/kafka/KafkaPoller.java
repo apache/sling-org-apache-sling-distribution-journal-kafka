@@ -60,13 +60,11 @@ public class KafkaPoller<T> implements Closeable {
     }
     
     public static Closeable createProtobufPoller(KafkaConsumer<String, byte[]> consumer, ExceptionEventSender eventSender, HandlerAdapter<?>... adapters) {
-        Consumer<ConsumerRecord<String, byte[]>> handler = new ProtobufRecordHandler(adapters);
-        return new KafkaPoller<byte[]>(consumer, eventSender, handler);
+        return new KafkaPoller<>(consumer, eventSender, new ProtobufRecordHandler(adapters));
     }
     
     public static <T>  Closeable createJsonPoller(KafkaConsumer<String, String> consumer, ExceptionEventSender eventSender, MessageHandler<T> handler, Class<T> clazz) {
-        Consumer<ConsumerRecord<String, String>> recordHandler = new JsonRecordHandler<T>(handler, clazz);
-        return new KafkaPoller<String>(consumer, eventSender, recordHandler);
+        return new KafkaPoller<>(consumer, eventSender, new JsonRecordHandler<T>(handler, clazz));
     }
 
     @Override

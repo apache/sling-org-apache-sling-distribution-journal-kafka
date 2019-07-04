@@ -59,7 +59,7 @@ public class KafkaJsonMessageSender<T> implements JsonMessageSender<T> {
             String payloadSt = writer.writeValueAsString(payload);
             ProducerRecord<String, String> record = new ProducerRecord<>(topic, PARTITION, null, payloadSt);
             RecordMetadata metadata = producer.send(record).get();
-            LOG.info(format("Sent JSON to %s", metadata));
+            LOG.info("Sent JSON to {}", metadata);
         } catch (Exception e) {
             eventSender.send(e);
             throw new MessagingException(format("Failed to send JSON message on topic %s", topic), e);
