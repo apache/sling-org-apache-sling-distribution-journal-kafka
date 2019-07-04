@@ -32,6 +32,7 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.sling.distribution.journal.HandlerAdapter;
 import org.apache.sling.distribution.journal.MessageInfo;
+import org.apache.sling.distribution.journal.MessagingException;
 import org.apache.sling.distribution.journal.messages.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +71,11 @@ public class ProtobufRecordHandler implements Consumer<ConsumerRecord<String, by
     private void handleRecord(HandlerAdapter<?> handler, ConsumerRecord<String, byte[]> record) {
         MessageInfo info = new KafkaMessageInfo(record);
         ByteString payload = ByteString.copyFrom(record.value());
-        handler.handle(info, payload);
+        try {
+            handler.handle(info, payload);
+        } catch (Exception e) {
+            throw new MessagingException(e.getMessage(), e);
+        }
     }
 
     private String getHeaderValue(Headers headers, String key) {
