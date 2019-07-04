@@ -146,7 +146,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         } else {
             consumer.seekToEnd(topicPartitions);
         }
-        Closeable poller = new KafkaMessagePoller(consumer, eventSender, adapters);
+        Closeable poller = KafkaPoller.createProtobufPoller(consumer, eventSender, adapters);
         LOG.info("Created poller for reset {}, topicName {}, assign {}", reset, topicName, assign);
         return poller;
     }
@@ -167,7 +167,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         } else {
             consumer.seekToEnd(topicPartitions);
         }
-        return new KafkaJsonMessagePoller<>(consumer, eventSender, handler, type);
+        return KafkaPoller.createJsonPoller(consumer, eventSender, handler, type);
     }
 
     @Override
