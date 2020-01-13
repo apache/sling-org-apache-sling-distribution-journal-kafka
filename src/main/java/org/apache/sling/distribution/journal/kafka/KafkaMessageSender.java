@@ -64,7 +64,7 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
         ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, PARTITION, null, null, payload.toByteArray(), toHeaders(type, version));
         try {
             RecordMetadata metadata = producer.send(record).get();
-            LOG.info("Sent to {}", metadata);
+            LOG.debug("Sent to {}", metadata);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             handleException(topic, e);
