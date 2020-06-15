@@ -67,7 +67,7 @@ public class KafkaMessageSender<T extends GeneratedMessage> implements MessageSe
             LOG.debug("Sent to {}", metadata);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            handleException(topic, e);
+            throw new MessagingException(format("Interrupted while trying to send to topic %s", topic), e);
         } catch (Exception e) {
             handleException(topic, e);
         }
