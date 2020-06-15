@@ -34,7 +34,7 @@
     <!-- P R O J E C T                                                           -->
     <!-- ======================================================================= -->
     <artifactId>org.apache.sling.distribution.journal.kafka</artifactId>
-    <version>0.1.5-SNAPSHOT</version>
+    <version>0.1.5-JSON-SNAPSHOT</version>
 
     <name>Apache Sling Journal Messaging based on Apache Kafka</name>
     <description>Implementation of Apache Sling Content Distribution Journal Messaging based on Apache Kafka.</description>
@@ -70,13 +70,12 @@
         <dependency>
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.distribution.journal.messages</artifactId>
-            <version>0.1.2</version>
+            <version>0.1.7-JSON-SNAPSHOT</version>
         </dependency>
         <!-- OSGi -->
         <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.service.component.annotations</artifactId>
-            <version>1.3.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
