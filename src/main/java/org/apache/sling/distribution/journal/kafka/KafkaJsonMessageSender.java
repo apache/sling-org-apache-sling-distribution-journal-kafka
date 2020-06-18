@@ -22,11 +22,14 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.apache.sling.distribution.journal.kafka.KafkaClientProvider.PARTITION;
 
+import java.util.Collections;
+import java.util.Map;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
-import org.apache.sling.distribution.journal.JsonMessageSender;
+import org.apache.sling.distribution.journal.MessageSender;
 import org.apache.sling.distribution.journal.MessagingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +37,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 
-public class KafkaJsonMessageSender<T> implements JsonMessageSender<T> {
+public class KafkaJsonMessageSender<T> implements MessageSender<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaJsonMessageSender.class);
 
@@ -44,25 +47,35 @@ public class KafkaJsonMessageSender<T> implements JsonMessageSender<T> {
 
     private final ExceptionEventSender eventSender;
 
-    public KafkaJsonMessageSender(KafkaProducer<String, String> producer, ExceptionEventSender eventSender) {
+    private final String topic;
+
+    public KafkaJsonMessageSender(KafkaProducer<String, String> producer, String topic, ExceptionEventSender eventSender) {
+        this.topic = topic;
         this.eventSender = eventSender;
         this.producer = requireNonNull(producer);
     }
 
+    
+    @Override
+    public void send(T payload) throws MessagingException {
+        send(payload, Collections.emptyMap());
+    }
+    
     /**
      * {@inheritDoc}
      */
     @Override
-    public void send(String topic, T payload) {
+    public void send(T payload, Map<String, String> properties) throws MessagingException {
         try {
             ObjectWriter writer = mapper.writerFor(payload.getClass());
             String payloadSt = writer.writeValueAsString(payload);
             ProducerRecord<String, String> record = new ProducerRecord<>(topic, PARTITION, null, payloadSt);
             RecordMetadata metadata = producer.send(record).get();
-            LOG.info("Sent JSON to {}", metadata);
+            LOG.info("Sent to topic={}, offset={}", topic, metadata.offset());
         } catch (Exception e) {
             eventSender.send(e);
             throw new MessagingException(format("Failed to send JSON message on topic %s", topic), e);
         }
     }
+
 }

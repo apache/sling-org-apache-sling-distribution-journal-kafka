@@ -31,7 +31,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.HandlerAdapter;
-import org.apache.sling.distribution.journal.MessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,12 +58,10 @@ public class KafkaPoller<T> implements Closeable {
         startBackgroundThread(this::run, "Message Poller");
     }
     
-    public static Closeable createProtobufPoller(KafkaConsumer<String, byte[]> consumer, ExceptionEventSender eventSender, HandlerAdapter<?>... adapters) {
-        return new KafkaPoller<>(consumer, eventSender, new ProtobufRecordHandler(adapters));
-    }
-    
-    public static <T>  Closeable createJsonPoller(KafkaConsumer<String, String> consumer, ExceptionEventSender eventSender, MessageHandler<T> handler, Class<T> clazz) {
-        return new KafkaPoller<>(consumer, eventSender, new JsonRecordHandler<T>(handler, clazz));
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public static Closeable createJsonPoller(KafkaConsumer<String, String> consumer, ExceptionEventSender eventSender, HandlerAdapter<?> ...adapters) {
+        HandlerAdapter<?> adapter = adapters[0];
+        return new KafkaPoller<>(consumer, eventSender, new JsonRecordHandler(adapter.getHandler(), adapter.getType()));
     }
 
     @Override

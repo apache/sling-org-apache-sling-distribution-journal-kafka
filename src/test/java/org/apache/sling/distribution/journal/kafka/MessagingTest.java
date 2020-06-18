@@ -34,9 +34,9 @@ import org.apache.sling.distribution.journal.MessageSender;
 import org.apache.sling.distribution.journal.MessagingProvider;
 import org.apache.sling.distribution.journal.Reset;
 import org.apache.sling.distribution.journal.kafka.util.KafkaRule;
-import org.apache.sling.distribution.journal.messages.Messages.CommandMessage;
-import org.apache.sling.distribution.journal.messages.Messages.DiscoveryMessage;
-import org.apache.sling.distribution.journal.messages.Messages.SubscriberConfiguration;
+import org.apache.sling.distribution.journal.messages.ClearCommand;
+import org.apache.sling.distribution.journal.messages.DiscoveryMessage;
+import org.apache.sling.distribution.journal.messages.SubscriberConfig;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -63,26 +63,25 @@ public class MessagingTest {
     
     @Test
     public void testSendReceive() throws Exception {
-        Closeable poller = provider.createPoller(topicName, Reset.earliest, handler);
-        MessageSender<DiscoveryMessage> messageSender = provider.createSender();
+        try (Closeable poller = provider.createPoller(topicName, Reset.earliest, provider.assignTo(0), handler)) {
+            MessageSender<DiscoveryMessage> messageSender = provider.createSender(topicName);
         
-        messageSender.send(topicName, createMessage());
-        assertReceived("Consumer started from earliest .. should see our message");
-        messageSender.send(topicName, createMessage());
-        assertReceived("Should also consume a second message");
-
-        poller.close();
+            messageSender.send(createMessage());
+            assertReceived("Consumer started from earliest .. should see our message");
+            messageSender.send(createMessage());
+            assertReceived("Should also consume a second message");
+        }
     }
     
     @Test
     public void testNoHandler() throws Exception {
         try (Closeable poller = provider.createPoller(topicName, Reset.earliest, handler)) {
-            MessageSender<CommandMessage> messageSender = provider.createSender();
-            CommandMessage msg = CommandMessage.newBuilder()
-                .setSubSlingId("subslingid")
-                .setSubAgentName("agentname")
+            MessageSender<ClearCommand> messageSender = provider.createSender(topicName);
+            ClearCommand msg = ClearCommand.builder()
+                .subSlingId("subslingid")
+                .subAgentName("agentname")
                 .build();
-            messageSender.send(topicName, msg);
+            messageSender.send(msg);
             assertNotReceived("Should not be received as we have no handler");
         }
     }
@@ -90,39 +89,38 @@ public class MessagingTest {
     @Test
     public void testAssign() throws Exception {
         DiscoveryMessage msg = createMessage();
-        MessageSender<DiscoveryMessage> messageSender = provider.createSender();
-        messageSender.send(topicName, msg);
+        MessageSender<DiscoveryMessage> messageSender = provider.createSender(topicName);
+        messageSender.send(msg);
         
         try (Closeable poller = provider.createPoller(topicName, Reset.earliest, handler)) {
             assertReceived("Starting from earliest .. should see our message");
         }
         long offset = lastInfo.getOffset();
         
-        String assign = "0:" + offset;
+        String assign = provider.assignTo(offset);
         try (Closeable poller = provider.createPoller(topicName, Reset.latest, assign, handler)) {
             assertReceived("Starting from old offset .. should see our message");
             assertThat(lastInfo.getOffset(), equalTo(offset));
         }
         
-        String invalid = "0:32532523453";
+        String invalid = provider.assignTo(32532523453l);
         try (Closeable poller1 = provider.createPoller(topicName, Reset.latest, invalid, handler)) {
-            assertNotReceived("Should see old message as we start from earliest");
+            assertNotReceived("Should not see message as we fall back to latest");
         }
         
-        String invalid1 = "0:32532523453";
-        try (Closeable poller2 = provider.createPoller(topicName, Reset.earliest, invalid1, handler)) {
-            assertReceived("Should not see any message as we start from latest");
+        try (Closeable poller2 = provider.createPoller(topicName, Reset.earliest, invalid, handler)) {
+            assertReceived("Should see message as we fall back to earliest");
         }
     }
 
     private DiscoveryMessage createMessage() {
-        return DiscoveryMessage.newBuilder()
-                .setSubAgentName("sub1agent")
-                .setSubSlingId("subsling")
-                .setSubscriberConfiguration(SubscriberConfiguration
-                        .newBuilder()
-                        .setEditable(false)
-                        .setMaxRetries(-1)
+        return DiscoveryMessage.builder()
+                .subAgentName("sub1agent")
+                .subSlingId("subsling")
+                .subscriberConfiguration(SubscriberConfig
+                        .builder()
+                        .editable(false)
+                        .maxRetries(-1)
                         .build())
                 .build();
     }

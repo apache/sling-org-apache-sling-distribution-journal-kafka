@@ -18,6 +18,9 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
+import java.util.Collections;
+import java.util.Map;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.sling.distribution.journal.MessageInfo;
 
@@ -27,8 +30,14 @@ public class KafkaMessageInfo implements MessageInfo {
     private final int partition;
     private final long offset;
     private final long createTime;
+    private final Map<String, String> props;
 
     public KafkaMessageInfo(ConsumerRecord<String, ?> record) {
+        this(record, Collections.emptyMap());
+    }
+    
+    public KafkaMessageInfo(ConsumerRecord<String, ?> record, Map<String, String> props) {
+        this.props = props;
         this.topic = record.topic();
         this.partition = record.partition();
         this.offset = record.offset();
@@ -52,8 +61,14 @@ public class KafkaMessageInfo implements MessageInfo {
     }
 
     @Override
+    public Map<String, String> getProps() {
+        return props;
+    }
+
+    @Override
     public String toString() {
         return String.format("Topic: %s, Partition: %d, Offset: %d, CreateTime: %d", 
                 topic, partition, offset, createTime);
     }
+
 }

@@ -52,15 +52,11 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.HandlerAdapter;
-import org.apache.sling.distribution.journal.JsonMessageSender;
-import org.apache.sling.distribution.journal.MessageHandler;
 import org.apache.sling.distribution.journal.MessageSender;
 import org.apache.sling.distribution.journal.MessagingException;
 import org.apache.sling.distribution.journal.MessagingProvider;
@@ -75,13 +71,11 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.GeneratedMessage;
-
 @Component(service = MessagingProvider.class, configurationPolicy = ConfigurationPolicy.REQUIRE)
 @Designate(ocd = KafkaEndpoint.class)
 public class KafkaClientProvider implements MessagingProvider, Closeable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(KafkaClientProvider.class);
+    private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     public static final int PARTITION = 0;
     
@@ -124,18 +118,14 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
 
     @Override
-    public <T extends GeneratedMessage> MessageSender<T> createSender() {
-        return new KafkaMessageSender<>(buildKafkaProducer(), eventSender);
-    }
-
-    @Override
-    public <T> Closeable createPoller(String topicName, Reset reset, HandlerAdapter<?>... adapters) {
-        return createPoller(topicName, reset, null, adapters);
+    public <T> MessageSender<T> createSender(String topic) {
+        return new KafkaJsonMessageSender<>(buildJsonKafkaProducer(), topic, eventSender);
     }
 
     @Override
     public Closeable createPoller(String topicName, Reset reset, @Nullable String assign, HandlerAdapter<?>... adapters) {
-        KafkaConsumer<String, byte[]> consumer = createConsumer(ByteArrayDeserializer.class, reset);
+        log.info("Creating poller for topic={}, reset={}, assing={} with adapters {}.", topicName, reset, assign, adapters);
+        KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, reset);
         TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
         Collection<TopicPartition> topicPartitions = singleton(topicPartition);
         consumer.assign(topicPartitions);
@@ -146,28 +136,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         } else {
             consumer.seekToEnd(topicPartitions);
         }
-        Closeable poller = KafkaPoller.createProtobufPoller(consumer, eventSender, adapters);
-        LOG.info("Created poller for reset {}, topicName {}, assign {}", reset, topicName, assign);
-        return poller;
-    }
-
-    @Override
-    public <T> JsonMessageSender<T> createJsonSender() {
-        return new KafkaJsonMessageSender<>(buildJsonKafkaProducer(), eventSender);
-    }
-
-    @Override
-    public <T> Closeable createJsonPoller(String topicName, Reset reset, MessageHandler<T> handler, Class<T> type) {
-        KafkaConsumer<String, String> consumer = createConsumer(StringDeserializer.class, reset);
-        TopicPartition topicPartition = new TopicPartition(topicName, PARTITION);
-        Collection<TopicPartition> topicPartitions = singleton(topicPartition);
-        consumer.assign(topicPartitions);
-        if (reset == Reset.earliest) {
-            consumer.seekToBeginning(topicPartitions);
-        } else {
-            consumer.seekToEnd(topicPartitions);
-        }
-        return KafkaPoller.createJsonPoller(consumer, eventSender, handler, type);
+        return KafkaPoller.createJsonPoller(consumer, eventSender, adapters);
     }
 
     @Override
@@ -223,17 +192,6 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     }
 
     @Nonnull
-    private synchronized KafkaProducer<String, byte[]> buildKafkaProducer() {
-        if (rawProducer == null) {
-            try (CLSwitch switcher = new CLSwitch(KafkaProducer.class.getClassLoader())) {
-                rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
-            }
-            rawProducer = new KafkaProducer<>(producerConfig(ByteArraySerializer.class));
-        }
-        return rawProducer;
-    }
-
-    @Nonnull
     private synchronized KafkaProducer<String, String> buildJsonKafkaProducer() {
         if (jsonProducer == null) {
             jsonProducer = new KafkaProducer<>(producerConfig(StringSerializer.class));
@@ -277,6 +235,4 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         }
         return Long.parseLong(chunks[1]);
     }
-
-
 }

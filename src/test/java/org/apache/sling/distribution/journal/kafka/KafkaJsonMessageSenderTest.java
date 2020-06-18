@@ -38,8 +38,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class KafkaJsonMessageSenderTest {
 
-    private static final String TOPIC = "topic";
-
     @Mock
     private ExceptionEventSender eventSender;
     
@@ -58,7 +56,7 @@ public class KafkaJsonMessageSenderTest {
         when(record.get()).thenThrow(new ExecutionException(new IOException("Expected")));
         Person person = new Person();
         person.name = "name";
-        sender.send(TOPIC, person);
+        sender.send(person);
     }
     
     public static class Person {

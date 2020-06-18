@@ -76,6 +76,7 @@ public class KafkaLocal implements Closeable {
         kafkaProps.put("log.dir",logDir);
         kafkaProps.put("group.initial.rebalance.delay.ms", "0");
         kafkaProps.put("group.min.session.timeout.ms", "1000");
+        kafkaProps.put("offsets.topic.replication.factor", "1");
         return kafkaProps;
     }
 
