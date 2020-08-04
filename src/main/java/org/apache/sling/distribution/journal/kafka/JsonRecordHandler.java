@@ -21,19 +21,14 @@ package org.apache.sling.distribution.journal.kafka;
 import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
-import java.util.function.Consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.sling.distribution.journal.MessageHandler;
 import org.apache.sling.distribution.journal.MessageInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 
-public class JsonRecordHandler<T> implements Consumer<ConsumerRecord<String, String>> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(JsonRecordHandler.class);
+public class JsonRecordHandler<T> {
 
     public final MessageHandler<T> handler;
 
@@ -45,14 +40,10 @@ public class JsonRecordHandler<T> implements Consumer<ConsumerRecord<String, Str
         
     }
 
-    public void accept(ConsumerRecord<String, String> record) {
+    public void accept(ConsumerRecord<String, String> record) throws IOException {
         MessageInfo info = new KafkaMessageInfo(record);
         String payload = record.value();
-        try {
-            T message = reader.readValue(payload);
-            handler.handle(info, message);
-        } catch (IOException e) {
-            LOG.warn("Failed to parse payload {}", payload);
-        }
+        T message = reader.readValue(payload);
+        handler.handle(info, message);
     }
 }

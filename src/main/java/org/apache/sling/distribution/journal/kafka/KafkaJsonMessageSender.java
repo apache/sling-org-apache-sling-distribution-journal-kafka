@@ -22,7 +22,7 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.apache.sling.distribution.journal.kafka.KafkaClientProvider.PARTITION;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +93,6 @@ public class KafkaJsonMessageSender<T> implements MessageSender<T> {
 
 
     private RecordHeader header(String key, String value) {
-        return new RecordHeader(key, value.getBytes(Charset.forName("utf-8")));
+        return new RecordHeader(key, value.getBytes(StandardCharsets.UTF_8));
     }
 }

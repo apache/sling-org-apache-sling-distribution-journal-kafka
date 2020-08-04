@@ -23,7 +23,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -94,7 +94,7 @@ public class KafkaPollerTest {
     }
 
     private RecordHeader header(String key, String value) {
-        return new RecordHeader(key, value.getBytes(Charset.forName("utf-8")));
+        return new RecordHeader(key, value.getBytes(StandardCharsets.UTF_8));
     }
     
     private ConsumerRecords<String, String> records(List<ConsumerRecord<String, String>> records) {
