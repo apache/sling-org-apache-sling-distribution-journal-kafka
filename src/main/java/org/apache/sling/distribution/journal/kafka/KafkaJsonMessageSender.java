@@ -78,7 +78,7 @@ public class KafkaJsonMessageSender<T> implements MessageSender<T> {
             List<Header> headerList = properties.entrySet().stream().map(this::toHeader).collect(Collectors.toList());
             RecordHeader messageType = header(KafkaMessageInfo.KEY_MESSAGE_TYPE, payload.getClass().getSimpleName());
             headerList.add(messageType);
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic, PARTITION, null, payloadSt, headerList);
+            ProducerRecord<String, String> record = new ProducerRecord<String, String>(topic, PARTITION, null, payloadSt, headerList);
             RecordMetadata metadata = producer.send(record).get();
             LOG.info("Sent to topic={}, offset={}", topic, metadata.offset());
         } catch (Exception e) {
