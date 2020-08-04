@@ -22,12 +22,18 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.apache.sling.distribution.journal.kafka.KafkaClientProvider.PARTITION;
 
+import java.nio.charset.Charset;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.MessageSender;
 import org.apache.sling.distribution.journal.MessagingException;
@@ -69,7 +75,10 @@ public class KafkaJsonMessageSender<T> implements MessageSender<T> {
         try {
             ObjectWriter writer = mapper.writerFor(payload.getClass());
             String payloadSt = writer.writeValueAsString(payload);
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic, PARTITION, null, payloadSt);
+            List<Header> headerList = properties.entrySet().stream().map(this::toHeader).collect(Collectors.toList());
+            RecordHeader messageType = header(KafkaMessageInfo.KEY_MESSAGE_TYPE, payload.getClass().getSimpleName());
+            headerList.add(messageType);
+            ProducerRecord<String, String> record = new ProducerRecord<>(topic, PARTITION, null, payloadSt, headerList);
             RecordMetadata metadata = producer.send(record).get();
             LOG.info("Sent to topic={}, offset={}", topic, metadata.offset());
         } catch (Exception e) {
@@ -78,4 +87,12 @@ public class KafkaJsonMessageSender<T> implements MessageSender<T> {
         }
     }
 
+    private Header toHeader(Entry<String, String> entry) {
+        return header(entry.getKey(), entry.getValue());
+    }
+
+
+    private RecordHeader header(String key, String value) {
+        return new RecordHeader(key, value.getBytes(Charset.forName("utf-8")));
+    }
 }

@@ -29,24 +29,22 @@ import org.apache.sling.distribution.journal.MessageInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 
 public class JsonRecordHandler<T> implements Consumer<ConsumerRecord<String, String>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JsonRecordHandler.class);
 
-    private final MessageHandler<T> handler;
+    public final MessageHandler<T> handler;
 
-    private final ObjectReader reader;
+    public final ObjectReader reader;
 
-    public JsonRecordHandler(MessageHandler<T> handler, Class<T> clazz) {
+    public JsonRecordHandler(MessageHandler<T> handler, ObjectReader reader) {
+        this.reader = reader;
         this.handler = requireNonNull(handler);
-        ObjectMapper mapper = new ObjectMapper();
-        reader = mapper.readerFor(requireNonNull(clazz));
+        
     }
 
-    @Override
     public void accept(ConsumerRecord<String, String> record) {
         MessageInfo info = new KafkaMessageInfo(record);
         String payload = record.value();

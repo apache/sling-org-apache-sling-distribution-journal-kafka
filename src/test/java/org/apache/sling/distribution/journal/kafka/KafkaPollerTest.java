@@ -23,11 +23,12 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -35,12 +36,22 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.apache.kafka.common.record.TimestampType;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
+import org.apache.sling.distribution.journal.HandlerAdapter;
+import org.apache.sling.distribution.journal.MessageHandler;
+import org.apache.sling.distribution.journal.MessageInfo;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RunWith(MockitoJUnitRunner.class)
 public class KafkaPollerTest {
@@ -52,24 +63,38 @@ public class KafkaPollerTest {
     private KafkaConsumer<String, String> consumer;
 
     @Mock
-    private Consumer<ConsumerRecord<String, String>> handler;
+    private MessageHandler<Person> handler;
 
-    @SuppressWarnings("unchecked")
     @Test
     public void testHandleError() throws Exception {
-        ConsumerRecord<String, String> record = new ConsumerRecord<String, String>("topic", 1, 0l, "", "");
+        Person person = new Person();
+        person.name = "Chris";
+        ConsumerRecord<String, String> record = createRecordFor(person);
         when(consumer.poll(Mockito.any()))
             .thenReturn(records(Arrays.asList(record)))
             .thenThrow(new KafkaException("Expected"))
             .thenThrow(new WakeupException());
-        doThrow(new RuntimeException("Expected")).when(handler).accept(Mockito.any(ConsumerRecord.class));
-        KafkaPoller<String> poller = new KafkaPoller<String>(consumer, eventSender, handler);
+        doThrow(new RuntimeException("Expected")).when(handler).handle(Mockito.any(MessageInfo.class), Mockito.any(Person.class));
+        List<HandlerAdapter<?>> adapters = Collections.singletonList(HandlerAdapter.create(Person.class, handler));
+        KafkaPoller poller = new KafkaPoller(consumer, eventSender, adapters);
         poller.errorSleepMs = 100;
         // Should see "Error consuming message" in the log
-        verify(handler, timeout(1000)).accept(Mockito.any(ConsumerRecord.class));
+        verify(handler, timeout(1000)).handle(Mockito.any(MessageInfo.class), Mockito.any(Person.class));
         verify(eventSender, timeout(1000)).send(Mockito.any(KafkaException.class));
         verify(consumer, timeout(1000)).close();
         poller.close();
+    }
+
+    private ConsumerRecord<String, String> createRecordFor(Person person) throws JsonProcessingException {
+        Headers headers = new RecordHeaders(Collections.singleton(header(KafkaMessageInfo.KEY_MESSAGE_TYPE, Person.class.getSimpleName())));
+        ObjectMapper mapper = new ObjectMapper();
+        String value = mapper.writerFor(Person.class).writeValueAsString(person);
+        return new ConsumerRecord<String, String>(
+                "topic", 1, 0l, 0l, TimestampType.CREATE_TIME, 0l, 0, 0, "", value, headers);
+    }
+
+    private RecordHeader header(String key, String value) {
+        return new RecordHeader(key, value.getBytes(Charset.forName("utf-8")));
     }
     
     private ConsumerRecords<String, String> records(List<ConsumerRecord<String, String>> records) {
