@@ -39,6 +39,7 @@ import static org.apache.kafka.common.config.SaslConfigs.SASL_MECHANISM;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -136,7 +137,7 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         } else {
             consumer.seekToEnd(topicPartitions);
         }
-        return KafkaPoller.createJsonPoller(consumer, eventSender, adapters);
+        return new KafkaPoller(consumer, eventSender, Arrays.asList(adapters));
     }
 
     @Override

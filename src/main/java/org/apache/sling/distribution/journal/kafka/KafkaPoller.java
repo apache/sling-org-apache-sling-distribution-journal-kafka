@@ -20,50 +20,65 @@ package org.apache.sling.distribution.journal.kafka;
 
 import static java.time.Duration.ofHours;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toMap;
 import static org.apache.sling.distribution.journal.RunnableUtil.startBackgroundThread;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.function.Consumer;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.header.Header;
 import org.apache.sling.distribution.journal.ExceptionEventSender;
 import org.apache.sling.distribution.journal.HandlerAdapter;
+import org.apache.sling.distribution.journal.MessagingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KafkaPoller<T> implements Closeable {
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+
+public class KafkaPoller implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaPoller.class);
 
     private static final long ERROR_SLEEP_MS = 10000;
 
-    private final KafkaConsumer<String, T> consumer;
+    private final KafkaConsumer<String, String> consumer;
 
-    private final Consumer<ConsumerRecord<String, T>> handler;
+    private final Map<String, JsonRecordHandler<?>> handlers;
     
     private final ExceptionEventSender eventSender;
     
+    private final ObjectMapper mapper;
+
     private volatile boolean running = true;
 
     long errorSleepMs;
 
-    public KafkaPoller(KafkaConsumer<String, T> consumer, ExceptionEventSender eventSender, Consumer<ConsumerRecord<String, T>> handler) {
-        this.handler = handler;
+    public KafkaPoller(KafkaConsumer<String, String> consumer, ExceptionEventSender eventSender, List<HandlerAdapter<?>> adapters) {
         this.consumer = requireNonNull(consumer);
         this.eventSender = requireNonNull(eventSender);
         this.errorSleepMs = ERROR_SLEEP_MS;
+        mapper = new ObjectMapper();
+        this.handlers = adapters.stream().collect(toMap(this::typeName, this::toHandler));
         startBackgroundThread(this::run, "Message Poller");
     }
-    
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public static Closeable createJsonPoller(KafkaConsumer<String, String> consumer, ExceptionEventSender eventSender, HandlerAdapter<?> ...adapters) {
-        HandlerAdapter<?> adapter = adapters[0];
-        return new KafkaPoller<>(consumer, eventSender, new JsonRecordHandler(adapter.getHandler(), adapter.getType()));
-    }
 
+    private String typeName(HandlerAdapter<?> adapter) {
+        return adapter.getType().getSimpleName();
+    }
+    
+    <T> JsonRecordHandler<T> toHandler(HandlerAdapter<T> adapter) {
+        ObjectReader reader = mapper.readerFor(adapter.getType());
+        return new JsonRecordHandler<>(adapter.getHandler(), reader);
+    }
+    
     @Override
     public void close() throws IOException {
         LOG.info("Shutdown poller");
@@ -90,12 +105,27 @@ public class KafkaPoller<T> implements Closeable {
         LOG.info("Stopped poller");
     }
     
-    public void handle(ConsumerRecord<String, T> record) {
+    public void handle(ConsumerRecord<String, String> record) {
         try {
-            handler.accept(record);
+            String messageType = getMessageType(record);
+            JsonRecordHandler<?> handler = handlers.get(messageType);
+            if (handler != null) {
+                handler.accept(record);
+            } else {
+                LOG.info("No handler for messageType={}. Ignoring message.", messageType);
+            }
         } catch (Exception e) {
-            LOG.warn("Error consuming message {}", record.headers());
+            LOG.warn("Error consuming message {}", record.headers(), e);
         }
+    }
+
+    private String getMessageType(ConsumerRecord<String, String> record) {
+        Iterator<Header> headers = record.headers().headers(KafkaMessageInfo.KEY_MESSAGE_TYPE).iterator();
+        if (!headers.hasNext()) {
+            throw new MessagingException("Header " + KafkaMessageInfo.KEY_MESSAGE_TYPE + " missing.");
+        }
+        Header messageTypeHeader = headers.next();
+        return new String(messageTypeHeader.value(), StandardCharsets.UTF_8);
     }
 
     private void sleepAfterError() {

@@ -25,6 +25,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.sling.distribution.journal.MessageInfo;
 
 public class KafkaMessageInfo implements MessageInfo {
+    public static final String KEY_MESSAGE_TYPE = "messageType";
 
     private final String topic;
     private final int partition;

@@ -52,5 +52,6 @@ public class KafkaMessageInfoTest {
         assertThat(info.getTopic(), equalTo(TOPIC));
         assertThat(info.getCreateTime(), equalTo(TIMESTAMP));
         assertThat(info.toString(), equalTo("Topic: topic, Partition: 0, Offset: 1, CreateTime: 2"));
+        assertThat(info.getProps().size(), equalTo(0));
     }
 }
