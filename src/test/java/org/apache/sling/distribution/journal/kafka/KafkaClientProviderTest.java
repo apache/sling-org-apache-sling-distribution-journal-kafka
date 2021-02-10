@@ -39,10 +39,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.Spy;
 import org.mockito.runners.MockitoJUnitRunner;
 import org.osgi.service.event.EventAdmin;
 
@@ -53,8 +51,6 @@ public class KafkaClientProviderTest {
     @Mock
     EventAdmin eventAdmin;
     
-    @InjectMocks
-    @Spy
     private KafkaClientProvider provider;
     
     @Mock
@@ -62,9 +58,9 @@ public class KafkaClientProviderTest {
     
     @Before
     public void before() {
-        doReturn(consumer).when(provider).createConsumer(Mockito.any(), Mockito.any());
         KafkaEndpoint config = buildKafkaEndpoint(emptyMap());
-        provider.activate(config);
+        provider = Mockito.spy(new KafkaClientProvider(eventAdmin, config));
+        doReturn(consumer).when(provider).createConsumer(Mockito.any(), Mockito.any());
     }
 
     @Test

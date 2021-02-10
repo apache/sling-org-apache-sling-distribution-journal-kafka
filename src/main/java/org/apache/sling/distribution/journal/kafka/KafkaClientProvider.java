@@ -39,6 +39,8 @@ import static org.apache.kafka.common.config.SaslConfigs.SASL_MECHANISM;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -80,31 +82,37 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
 
     public static final int PARTITION = 0;
     
-    @Reference
-    private EventAdmin eventAdmin;
+    private final ExceptionEventSender eventSender;
 
-    private ExceptionEventSender eventSender;
+    private final String kafkaBootstrapServers;
 
-    private KafkaProducer<String, byte[]> rawProducer = null;
+    private final int requestTimeout;
 
-    private KafkaProducer<String, String> jsonProducer = null;
+    private final int defaultApiTimeout;
 
-    private String kafkaBootstrapServers;
+    private final String securityProtocol;
 
-    private int requestTimeout;
+    private final String saslMechanism;
 
-    private int defaultApiTimeout;
+    private final String saslJaasConfig;
 
-    private String securityProtocol;
+    private final URI serverUri;
 
-    private String saslMechanism;
-
-    private String saslJaasConfig;
+    private transient KafkaProducer<String, String> jsonProducer = null;
 
     @Activate
-    public void activate(KafkaEndpoint kafkaEndpoint) {
+    public KafkaClientProvider(
+            @Reference EventAdmin eventAdmin, 
+            KafkaEndpoint kafkaEndpoint
+            ) {
         eventSender = new ExceptionEventSender(eventAdmin);
         kafkaBootstrapServers = requireNonNull(kafkaEndpoint.kafkaBootstrapServers());
+        String[] servers = kafkaBootstrapServers.split(",");
+        try {
+            serverUri = new URI(servers[0]);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
         requestTimeout = kafkaEndpoint.kafkaRequestTimeout();
         defaultApiTimeout = kafkaEndpoint.kafkaDefaultApiTimeout();
         securityProtocol = kafkaEndpoint.securityProtocol();
@@ -114,7 +122,6 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     
     @Deactivate
     public synchronized void close() {
-        closeQuietly(rawProducer);
         closeQuietly(jsonProducer);
     }
 
@@ -235,5 +242,10 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
             throw new IllegalArgumentException(format("Illegal assign %s", assign));
         }
         return Long.parseLong(chunks[1]);
+    }
+
+    @Override
+    public URI getServerUri() {
+        return serverUri;
     }
 }

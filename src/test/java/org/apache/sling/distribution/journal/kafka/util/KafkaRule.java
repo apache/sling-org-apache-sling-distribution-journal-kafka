@@ -53,13 +53,10 @@ public class KafkaRule implements TestRule {
     }
 
     private KafkaClientProvider createProvider() {
-        KafkaClientProvider provider = new KafkaClientProvider();
-
         Map<String, Object> props = new HashMap<>();
         props.put("connectTimeout", "5000");
         KafkaEndpoint config = buildKafkaEndpoint(props);
-        provider.activate(config);
-        return provider;
+        return new KafkaClientProvider(null, config);
     }
     
     public MessagingProvider getProvider() {
