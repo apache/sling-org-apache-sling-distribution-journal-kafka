@@ -18,9 +18,9 @@
  */
 package org.apache.sling.distribution.journal.kafka;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.io.Closeable;
@@ -110,6 +110,39 @@ public class MessagingTest {
         
         try (Closeable poller2 = provider.createPoller(topicName, Reset.earliest, invalid, handler)) {
             assertReceived("Should see message as we fall back to earliest");
+        }
+    }
+    
+    
+    @Test
+    public void testAssignRelativeLatest() throws Exception {
+        DiscoveryMessage msg = createMessage();
+        MessageSender<DiscoveryMessage> messageSender = provider.createSender(topicName);
+        messageSender.send(msg);
+        
+        String assign1 = provider.assignTo(Reset.latest, -1);
+        try (Closeable poller = provider.createPoller(topicName, Reset.latest, assign1, handler)) {
+            assertReceived("Starting from latest:-1 .. should see our message");
+        }
+        String assign2 = provider.assignTo(Reset.latest, 0);
+        try (Closeable poller1 = provider.createPoller(topicName, Reset.latest, assign2, handler)) {
+            assertNotReceived("Should not see message as we fall back to latest");
+        }
+    }
+    
+    @Test
+    public void testAssignRelativeEarliest() throws Exception {
+        DiscoveryMessage msg = createMessage();
+        MessageSender<DiscoveryMessage> messageSender = provider.createSender(topicName);
+        messageSender.send(msg);
+        
+        String assign1 = provider.assignTo(Reset.earliest, 0);
+        try (Closeable poller = provider.createPoller(topicName, Reset.latest, assign1, handler)) {
+            assertReceived("Starting from latest:-1 .. should see our message");
+        }
+        String assign2 = provider.assignTo(Reset.earliest, 1);
+        try (Closeable poller1 = provider.createPoller(topicName, Reset.latest, assign2, handler)) {
+            assertNotReceived("Should not see message as we fall back to latest");
         }
     }
 
