@@ -255,8 +255,8 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         AssignDetails(String assign) {
             String[] chunks = assign.split(":");
             if (chunks.length == 3) {
-                String reset = chunks[1];
-                this.reset = Reset.valueOf(reset);
+                String resetSt = chunks[1];
+                this.reset = Reset.valueOf(resetSt);
                 offset = Long.parseLong(chunks[2]);
             } else if (chunks.length == 2) {
                 reset = null;
