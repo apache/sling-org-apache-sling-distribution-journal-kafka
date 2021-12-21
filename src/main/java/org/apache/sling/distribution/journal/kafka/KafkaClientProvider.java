@@ -138,7 +138,9 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         Collection<TopicPartition> topicPartitions = singleton(topicPartition);
         consumer.assign(topicPartitions);
         if (assign != null) {
-            consumer.seek(topicPartition, offset(assign));
+            AssignDetails assignDetails = new AssignDetails(assign);
+            long offset = assignDetails.getOffset(consumer, topicPartition);
+            consumer.seek(topicPartition, offset);
         } else if (reset == Reset.earliest) {
             consumer.seekToBeginning(topicPartitions);
         } else {
@@ -180,6 +182,11 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
     @Override
     public String assignTo(long offset) {
         return format("%s:%s", PARTITION, offset);
+    }
+    
+    @Override
+    public String assignTo(Reset reset, long relativeOffset) {
+        return format("%s:%s:%d", PARTITION, reset.name(), relativeOffset);
     }
 
     protected <T> KafkaConsumer<String, T> createConsumer(Class<? extends Deserializer<?>> deserializer, Reset reset) {
@@ -236,16 +243,38 @@ public class KafkaClientProvider implements MessagingProvider, Closeable {
         return config;
     }
 
-    private long offset(String assign) {
-        String[] chunks = assign.split(":");
-        if (chunks.length != 2) {
-            throw new IllegalArgumentException(format("Illegal assign %s", assign));
-        }
-        return Long.parseLong(chunks[1]);
-    }
-
     @Override
     public URI getServerUri() {
         return serverUri;
+    }
+    
+    static class AssignDetails {
+        private final Reset reset;
+        private final long offset;
+
+        AssignDetails(String assign) {
+            String[] chunks = assign.split(":");
+            if (chunks.length == 3) {
+                String resetSt = chunks[1];
+                this.reset = Reset.valueOf(resetSt);
+                offset = Long.parseLong(chunks[2]);
+            } else if (chunks.length == 2) {
+                reset = null;
+                offset = Long.parseLong(chunks[1]);
+            } else {
+                throw new IllegalArgumentException(format("Illegal assign %s", assign));
+            }
+        }
+
+        long getOffset(KafkaConsumer<String, String> consumer, TopicPartition topicPartition) {
+            Collection<TopicPartition> partitions = singleton(topicPartition);
+            if (reset == Reset.earliest) {
+                return consumer.beginningOffsets(partitions).get(topicPartition) + offset;
+            } else if (reset == Reset.latest) {
+                return consumer.endOffsets(partitions).get(topicPartition) + offset;
+            } else {
+                return offset;
+            }
+        }
     }
 }

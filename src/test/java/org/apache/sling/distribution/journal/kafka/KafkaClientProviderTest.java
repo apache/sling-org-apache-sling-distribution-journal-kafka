@@ -21,10 +21,11 @@ package org.apache.sling.distribution.journal.kafka;
 import static java.util.Collections.emptyMap;
 import static org.apache.sling.distribution.journal.kafka.util.KafkaEndpointBuilder.buildKafkaEndpoint;
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +34,7 @@ import java.util.Map;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.sling.distribution.journal.HandlerAdapter;
 import org.apache.sling.distribution.journal.MessagingException;
 import org.apache.sling.distribution.journal.Reset;
 import org.junit.Assert;
@@ -115,5 +117,23 @@ public class KafkaClientProviderTest {
     public void testAssignTo() throws Exception {
         String assign = provider.assignTo(1l);
         assertThat(assign, equalTo("0:1"));
+    }
+    
+    @Test
+    public void testAssignToRelative() throws Exception {
+        String assign = provider.assignTo(Reset.latest, -1l);
+        assertThat(assign, equalTo("0:latest:-1"));
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidAssign() throws Exception {
+        HandlerAdapter<?> handler = Mockito.mock(HandlerAdapter.class);
+        provider.createPoller(TOPIC, Reset.latest, "", handler);
+    }
+    
+    @Test
+    public void testGeServerURI() throws Exception {
+        URI serverUri = provider.getServerUri();
+        assertThat(serverUri.toString(), equalTo("localhost:9092"));
     }
 }

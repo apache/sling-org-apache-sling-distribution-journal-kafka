@@ -19,7 +19,7 @@
 package org.apache.sling.distribution.journal.kafka;
 
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.when;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
