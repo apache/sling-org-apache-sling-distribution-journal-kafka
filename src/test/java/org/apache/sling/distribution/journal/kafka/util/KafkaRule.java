@@ -55,6 +55,7 @@ public class KafkaRule implements TestRule {
     private KafkaClientProvider createProvider() {
         Map<String, Object> props = new HashMap<>();
         props.put("connectTimeout", "5000");
+        props.put("saslJaasConfig", "");
         KafkaEndpoint config = buildKafkaEndpoint(props);
         return new KafkaClientProvider(null, config);
     }

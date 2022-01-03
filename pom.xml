@@ -26,7 +26,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling-bundle-parent</artifactId>
-        <version>41</version>
+        <version>46</version>
         <relativePath />
     </parent>
 
@@ -40,7 +40,8 @@
     <description>Implementation of Apache Sling Content Distribution Journal Messaging based on Apache Kafka.</description>
 
     <properties>
-        <sling.java.version>8</sling.java.version>
+        <project.build.outputTimestamp>1</project.build.outputTimestamp>
+        <sling.java.version>11</sling.java.version>
     </properties>
 
     <scm>

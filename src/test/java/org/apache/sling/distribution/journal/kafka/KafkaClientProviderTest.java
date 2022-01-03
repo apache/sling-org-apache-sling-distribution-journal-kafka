@@ -60,7 +60,8 @@ public class KafkaClientProviderTest {
     
     @Before
     public void before() {
-        KafkaEndpoint config = buildKafkaEndpoint(emptyMap());
+        Map<String, Object> props = Map.of("saslJaasConfig", "");
+        KafkaEndpoint config = buildKafkaEndpoint(props);
         provider = Mockito.spy(new KafkaClientProvider(eventAdmin, config));
         doReturn(consumer).when(provider).createConsumer(Mockito.any(), Mockito.any());
     }
